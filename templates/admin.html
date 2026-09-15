@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Home</title>
+        <link rel="stylesheet" href="/static/css/style.css">
+        <script src="/static/js/app.js" defer></script>
+    </head>
+    <body>
+        <nav>
+            <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
+        </nav>
+        <h1>Hallo, {{ naam }}</h1>
+        <p>Dit zijn de mensen die zo dom waren om hun privé informatie te delen.</p>
+            {% if info %}
+                <ul>
+                {% for persoon, priveinfo in info %}
+                    <li>{{ persoon }}: Leeftijd {{ priveinfo.leeftijd }}, Email: {{ priveinfo.email }}, Bankkaartnummer: {{ priveinfo.bankkaartnummer }}, Pincode: {{ priveinfo.pincode }}</li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <h3>Geen berichten gevonden.</h3>
+            {% endif %}
+    </body>
+</html>
