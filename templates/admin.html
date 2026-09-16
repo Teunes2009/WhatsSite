@@ -9,16 +9,16 @@
         <nav>
             <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
         </nav>
-        <h1>Hallo, {{ naam }}</h1>
-        <p>Dit zijn de mensen die zo dom waren om hun privé informatie te delen.</p>
+        <h1>Adminpaneel</h1>
+        <p>Dit zijn de gebruikers en hun wachtwoorden.</p>
             {% if info %}
                 <ul>
-                {% for persoon, priveinfo in info %}
-                    <li>{{ persoon }}: Leeftijd {{ priveinfo.leeftijd }}, Email: {{ priveinfo.email }}, Bankkaartnummer: {{ priveinfo.bankkaartnummer }}, Pincode: {{ priveinfo.pincode }}</li>
+                {% for persoon, wachtwoord in info %}
+                    <li>{{ persoon }}: Wachtwoord: {{ wachtwoord.wachtwoord }}</li>
                 {% endfor %}
                 </ul>
             {% else %}
-                <h3>Geen berichten gevonden.</h3>
+                <h3>Nog geen gebruikers.</h3>
             {% endif %}
     </body>
 </html>
