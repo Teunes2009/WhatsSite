@@ -11,18 +11,20 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # with SqliteDict("wachtwoorden.db") as db:
-#     print(db.keys())
-#     for user in db.keys():
-#         print(user, db[user])
-#         del db[user]
-#         # print(user, db[user], db[user])
-#         # password = db[user].get("pincode")
-#         # if password != None:
-#         #     print("pincode found for user", user, ":", password)
-#         #     del db[user]
-#         #     #print(db[user])
-#         #     db[user] = password
-#     db.commit()
+#     with SqliteDict("Messages.db") as db:
+
+#         print(db.keys())
+#         for user in db.keys():
+#             print(user, db[user])
+#             del db[user]
+#             # print(user, db[user], db[user])
+#             # password = db[user].get("pincode")
+#             # if password != None:
+#             #     print("pincode found for user", user, ":", password)
+#             #     del db[user]
+#             #     #print(db[user])
+#             #     db[user] = password
+#         db.commit()
 
 @app.get("/")
 async def home():
@@ -49,32 +51,71 @@ async def verstuur(request: Request, naam: str = Form(...), wachtwoord: str = Fo
 
         if naam in db:
             if db[naam]["wachtwoord"] == wachtwoord:
-                return RedirectResponse(url="/login", status_code=303)
+                return RedirectResponse(url="/login")
             return RedirectResponse(url="/form", status_code=303)
 
         db[naam] = {"wachtwoord": wachtwoord}
         db.commit()
-    return RedirectResponse(url="/bedankt", status_code=303)
+    return RedirectResponse(url="/login")
 
 @app.post("/login")
 def login(request: Request, naam: str = Form(...)):
-    with SqliteDict("wachtwoorden.db") as db:
-        messages = db[naam].get("messages", [])
+    with SqliteDict("Chats.db") as db:
+        if naam not in db:
+            db[naam] = ["Main"]
+            db.commit()
+        CurrentChats = db[naam]
+    print(CurrentChats)
+    with SqliteDict("Messages.db") as db:
+        Messages = {}
+        for Chat in CurrentChats:
+            if Chat not in db:
+                db[Chat] = []
+                db.commit()
+            Messages[Chat] = db[Chat]
+        print(Messages)
+        # messages = db[naam].get("", [])
         return templates.TemplateResponse(
             request,
             "ingelogd.html",
-            {"naam": naam, "messages": messages}
+            {"naam": naam, "Messages": Messages}
         )
+
+@app.get("/Chats/{ChatName}")
+def chat(request: Request, ChatName: str):
+    with SqliteDict("Messages.db") as db:
+        if ChatName not in db:
+            db[ChatName] = []
+            db.commit()
+        Messages = db[ChatName]
+        print(Messages)
+        return templates.TemplateResponse(
+            request,
+            "chat.html",
+            {"ChatName": ChatName, "Messages": Messages}
+        )
+
+@app.post("/send")
+def send(request: Request, ChatName: str, Message: str):
+    with SqliteDict("Messages.db") as db:
+        if ChatName not in db:
+            db[ChatName] = []
+        db[ChatName].append(Message)
+        db.commit()
+    return RedirectResponse(url=f"/Chats/{ChatName}", status_code=303)
 
 @app.post("/admin")
 def admin(request: Request):
     with SqliteDict("wachtwoorden.db") as db:
         all_info = list(db.items())
         print(all_info)
+    with SqliteDict("Messages.db") as db:
+        all_messages = list(db.items())
+        print(all_messages)
     return templates.TemplateResponse(
         request,
         "admin.html",
-        {"info": all_info}
+        {"info": all_info, "messages": all_messages}
     )
 
 @app.get("/bedankt")

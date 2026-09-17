@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Home</title>
+        <link rel="stylesheet" href="/static/css/style.css">
+        <script src="/static/js/app.js" defer></script>
+    </head>
+    <body>
+        <nav>
+            <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
+        </nav>
+        <h1>{{ChatName}}</h1>
+            {% if Messages %}
+                {% for Message in Messages %}
+                    <p>{{ Message }}</p>
+                {% endfor %}
+            {% else %}
+                <h3>nog geen berichten.</h3>
+            {% endif %}
+            <form method="post" action="send">
+                <input type="text" name="Message" placeholder="Typ je bericht hier..." required>
+                <button type="submit">Verstuur</button>
+            </form>
+    </body>
+</html>

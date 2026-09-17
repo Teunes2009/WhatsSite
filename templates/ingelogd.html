@@ -11,10 +11,10 @@
         </nav>
         <h1>Hallo, {{ naam }}!</h1>
         <p>Dit zijn uw chats:</p>
-            {% if info %}
+            {% if Messages %}
                 <ul>
-                {% for persoon, priveinfo in info %}
-                    <li>{{ persoon }}: Leeftijd {{ priveinfo.leeftijd }}, Email: {{ priveinfo.email }}, Bankkaartnummer: {{ priveinfo.bankkaartnummer }}, Pincode: {{ priveinfo.pincode }}</li>
+                {% for ChatName in Messages %}
+                    <li><a href="/Chats/{{ ChatName }}">{{ ChatName }}</a></li>
                 {% endfor %}
                 </ul>
             {% else %}
