@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Form, Request, HTTPException
+from fastapi import FastAPI, Form, Request, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -26,8 +26,9 @@ templates = Jinja2Templates(directory="templates")
 #             #     db[user] = password
 #         db.commit()
 
-with SqliteDict("Messages.db") as db:
-    del 
+# with SqliteDict("Messages.db") as db:
+#     del 
+
 @app.get("/")
 async def home():
     return FileResponse("static/pages/home.html")
@@ -105,13 +106,26 @@ def send(request: Request, Message: str, ChatName: str, Name: str):
         if ChatName not in db:
             db[ChatName] = []
         Messages = db[ChatName]
-        Messages.append({"Name": Name, "Message": Message})
+        Messages.append({"Name": Name, "Text": Message})
         db[ChatName] = Messages
         db.commit()
     return templates.TemplateResponse(
         request,
         "Message.html",
         {"ChatName": ChatName, "Messages": Messages, "Name": Name}
+    )
+
+@app.get("/Chats/GetMessages")
+def get_messages(request: Request, ChatName: str = Query(...)):
+    with SqliteDict("Messages.db") as db:
+        if ChatName not in db:
+            db[ChatName] = []
+        Messages = db[ChatName]
+        print(Messages)
+    return templates.TemplateResponse(
+        request,
+        "Message.html",
+        {"ChatName": ChatName, "Messages": Messages}
     )
 
 @app.post("/admin")

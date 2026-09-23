@@ -10,10 +10,10 @@
             <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
         </nav>
         <h1>{{ChatName}}</h1>
-        <div id="MessageBox">
+        <div id="MessageBox" hx-get="/Chats/GetMessages" hx-target="0.5s" hx-vals='{"Chat":{{ChatName}}}'>
             {% if Messages %}
                 {% for Message in Messages %}
-                    <p>{{ Message.naam }}: {{ Message.message }}</p>
+                    <p>{{ Message.Name }}: {{ Message.Text }}</p>
                 {% endfor %}
             {% else %}
                 <h3>nog geen berichten.</h3>
