@@ -26,6 +26,8 @@ templates = Jinja2Templates(directory="templates")
 #             #     db[user] = password
 #         db.commit()
 
+with SqliteDict("Messages.db") as db:
+    del 
 @app.get("/")
 async def home():
     return FileResponse("static/pages/home.html")
@@ -75,14 +77,14 @@ def login(request: Request, naam: str = Form(...)):
             Messages[Chat] = db[Chat]
         print(Messages)
         # messages = db[naam].get("", [])
-        return templates.TemplateResponse(
-            request,
-            "ingelogd.html",
-            {"naam": naam, "Messages": Messages}
-        )
+    return templates.TemplateResponse(
+        request,
+        "ingelogd.html",
+        {"naam": naam, "Messages": Messages}
+    )
 
-@app.get("/Chats/{ChatName}")
-def chat(request: Request, ChatName: str):
+@app.post("/Chats/{ChatName}")
+def chat(request: Request, ChatName: str, Name: str = Form(...)):
     with SqliteDict("Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
@@ -92,17 +94,25 @@ def chat(request: Request, ChatName: str):
         return templates.TemplateResponse(
             request,
             "chat.html",
-            {"ChatName": ChatName, "Messages": Messages}
+            {"ChatName": ChatName, "Messages": Messages, "Name": Name}
         )
 
-@app.post("/send")
-def send(request: Request, ChatName: str, Message: str):
+@app.get("/Chats/send")
+def send(request: Request, Message: str, ChatName: str, Name: str):
+    print(Message, ChatName, Name)
     with SqliteDict("Messages.db") as db:
+        print(db.keys())
         if ChatName not in db:
             db[ChatName] = []
-        db[ChatName].append(Message)
+        Messages = db[ChatName]
+        Messages.append({"Name": Name, "Message": Message})
+        db[ChatName] = Messages
         db.commit()
-    return RedirectResponse(url=f"/Chats/{ChatName}", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "Message.html",
+        {"ChatName": ChatName, "Messages": Messages, "Name": Name}
+    )
 
 @app.post("/admin")
 def admin(request: Request):

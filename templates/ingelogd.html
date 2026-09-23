@@ -14,7 +14,13 @@
             {% if Messages %}
                 <ul>
                 {% for ChatName in Messages %}
-                    <li><a href="/Chats/{{ ChatName }}">{{ ChatName }}</a></li>
+                    <li>
+                        <form method=post action="/Chats/{{ ChatName }}">
+                            <input type="hidden" name="Name" value="{{ naam }}">
+                            <input type="hidden" name="ChatName" value="{{ ChatName }}">
+                            <button type="submit">{{ ChatName }}</button>
+                        </form>
+                    </li>
                 {% endfor %}
                 </ul>
             {% else %}

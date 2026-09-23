@@ -3,23 +3,27 @@
     <head>
         <title>Home</title>
         <link rel="stylesheet" href="/static/css/style.css">
-        <script src="/static/js/app.js" defer></script>
+        <script src="/static/js/htmx.min.js"></script>
     </head>
     <body>
         <nav>
             <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
         </nav>
         <h1>{{ChatName}}</h1>
+        <div id="MessageBox">
             {% if Messages %}
                 {% for Message in Messages %}
-                    <p>{{ Message }}</p>
+                    <p>{{ Message.naam }}: {{ Message.message }}</p>
                 {% endfor %}
             {% else %}
                 <h3>nog geen berichten.</h3>
             {% endif %}
-            <form method="post" action="send">
-                <input type="text" name="Message" placeholder="Typ je bericht hier..." required>
-                <button type="submit">Verstuur</button>
-            </form>
+        </div>
+        <form hx-get="/Chats/send" hx-target="#MessageBox">
+            <input type="hidden" name="Name" value="{{ Name }}">
+            <input type="hidden" name="ChatName" value="{{ ChatName }}">
+            <input type="text" name="Message" placeholder="Typ je bericht hier..." required>
+            <button type="submit">Verstuur</button>
+        </form>
     </body>
 </html>
