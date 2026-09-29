@@ -115,8 +115,9 @@ def send(request: Request, Message: str, ChatName: str, Name: str):
         {"ChatName": ChatName, "Messages": Messages, "Name": Name}
     )
 
-@app.get("/Chats/GetMessages")
-def get_messages(request: Request, ChatName: str = Query(...)):
+@app.post("/Chats/GetMessages")
+def get_messages(request: Request, ChatName: str = Form(...)):
+    print(ChatName)
     with SqliteDict("Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
