@@ -10,16 +10,16 @@
             <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
         </nav>
         <h1>{{ChatName}}</h1>
-        <div id="MessageBox" hx-post="/Chats/GetMessages" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":{{ChatName}}}' hx-target="#MessageBox">
+        <div id="MessageBox" hx-post="/Chats/GetMessages" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}"}' hx-target="#MessageBox">
             {% if Messages %}
                 {% for Message in Messages %}
                     <p>{{ Message.Name }}: {{ Message.Text }}</p>
                 {% endfor %}
             {% else %}
-                <h3>nog geen berichten.</h3>
+                <h3>Er zijn nog geen berichten verstuurd.</h3>
             {% endif %}
         </div>
-        <form hx-post="/Chats/send" hx-target="#MessageBox">
+        <form hx-post="/Chats/Send" hx-target="#MessageBox">
             <input type="hidden" name="Name" value="{{ Name }}">
             <input type="hidden" name="ChatName" value="{{ ChatName }}">
             <input type="text" name="Message" placeholder="Typ je bericht hier..." required>

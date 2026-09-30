@@ -62,7 +62,7 @@ async def verstuur(request: Request, naam: str = Form(...), wachtwoord: str = Fo
     return RedirectResponse(url="/login")
 
 @app.post("/login")
-def login(request: Request, naam: str = Form(...)):
+async def login(request: Request, naam: str = Form(...)):
     with SqliteDict("Chats.db") as db:
         if naam not in db:
             db[naam] = ["Main"]
@@ -84,22 +84,9 @@ def login(request: Request, naam: str = Form(...)):
         {"naam": naam, "Messages": Messages}
     )
 
-@app.post("/Chats/{ChatName}")
-def chat(request: Request, ChatName: str, Name: str = Form(...)):
-    with SqliteDict("Messages.db") as db:
-        if ChatName not in db:
-            db[ChatName] = []
-            db.commit()
-        Messages = db[ChatName]
-        print(Messages)
-        return templates.TemplateResponse(
-            request,
-            "chat.html",
-            {"ChatName": ChatName, "Messages": Messages, "Name": Name}
-        )
-
-@app.get("/Chats/send")
-def send(request: Request, Message: str, ChatName: str, Name: str):
+@app.post("/Chats/Send")
+async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Form(...)):
+    print(Name, "sent ", Message, "in", ChatName)
     print(Message, ChatName, Name)
     with SqliteDict("Messages.db") as db:
         print(db.keys())
@@ -112,25 +99,39 @@ def send(request: Request, Message: str, ChatName: str, Name: str):
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"ChatName": ChatName, "Messages": Messages, "Name": Name}
+        {"ChatName": ChatName, "Messages": Messages}
     )
 
 @app.post("/Chats/GetMessages")
-def get_messages(request: Request, ChatName: str = Form(...)):
+async def get_messages(request: Request, ChatName: str = Form(...)):
     print(ChatName)
     with SqliteDict("Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
         Messages = db[ChatName]
-        print(Messages)
+        # print(Messages)
     return templates.TemplateResponse(
         request,
         "Message.html",
         {"ChatName": ChatName, "Messages": Messages}
     )
 
+@app.post("/Chats/{ChatName}")
+async def chat(request: Request, ChatName: str, Name: str = Form(...)):
+    with SqliteDict("Messages.db") as db:
+        if ChatName not in db:
+            db[ChatName] = []
+            db.commit()
+        Messages = db[ChatName]
+        print(Messages)
+        return templates.TemplateResponse(
+            request,
+            "chat.html",
+            {"ChatName": ChatName, "Messages": Messages, "Name": Name}
+        )
+
 @app.post("/admin")
-def admin(request: Request):
+async def admin(request: Request):
     with SqliteDict("wachtwoorden.db") as db:
         all_info = list(db.items())
         print(all_info)

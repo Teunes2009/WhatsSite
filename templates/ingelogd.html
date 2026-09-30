@@ -24,7 +24,13 @@
                 {% endfor %}
                 </ul>
             {% else %}
-                <h3>Geen berichten gevonden.</h3>
+                <h3>U heeft nog geen chats.</h3>
             {% endif %}
+        <form method=post action="/Chats/Create">
+            <input type="hidden" name="Name" value="{{ naam }}">
+            <input type="text" name="ChatName" placeholder="Naam van de chat" required>
+            <input type="text" name="Members" placeholder="Leden van de chat, gescheiden door een komma" required>
+            <button type="submit">Nieuwe Chat</button>
+        </form>
     </body>
 </html>
