@@ -84,6 +84,43 @@ async def login(request: Request, naam: str = Form(...)):
         {"naam": naam, "Messages": Messages}
     )
 
+@app.post("/Create")
+async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Members: str = Form(...)):
+    print("Creating chat", ChatName, "with members", Members, "by", Name)
+    with SqliteDict("Messages.db") as db:
+        if ChatName in db:
+            raise HTTPException(status_code=400, detail="Chat already exists")
+        if ChatName in ["Main", "Send", "GetMessages", ""]:
+            raise HTTPException(status_code=400, detail="Chat name is invalid")
+        db[ChatName] = []
+        db.commit()
+    with SqliteDict("Chats.db") as db:
+        NewMembers = [Name]
+        for Member in Members.split(","):
+            if Member in db:
+                NewMembers.append(Member)
+                db[Member].append(ChatName)
+        db[Name].append(ChatName)
+        print(db[Name], NewMembers)
+        db.commit()
+    return templates.TemplateResponse(
+        request,
+        "ChatList.html",
+        {"naam": Name, "Messages": db[Name]}
+    )
+
+@app.post("/GetChats")
+async def get_chats(request: Request, Name: str = Form(...)):
+    with SqliteDict("Chats.db") as db:
+        print(db.keys(), Name, db[Name], db.get(Name, []))
+        CurrentChats = db.get(Name, [])
+    print(CurrentChats)
+    return templates.TemplateResponse(
+        request,
+        "ChatList.html",
+        {"naam": Name, "Messages": CurrentChats}
+    )
+
 @app.post("/Chats/Send")
 async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Form(...)):
     print(Name, "sent ", Message, "in", ChatName)

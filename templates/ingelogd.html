@@ -4,6 +4,7 @@
         <title>Home</title>
         <link rel="stylesheet" href="/static/css/style.css">
         <script src="/static/js/app.js" defer></script>
+        <script src="/static/js/htmx.min.js"></script>
     </head>
     <body>
         <nav>
@@ -11,6 +12,7 @@
         </nav>
         <h1>Hallo, {{ naam }}!</h1>
         <p>Dit zijn uw chats:</p>
+        <div id="ChatList" hx-post="/GetChats" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"Name":"{{ naam }}"}' hx-target="#ChatList">
             {% if Messages %}
                 <ul>
                 {% for ChatName in Messages %}
@@ -26,7 +28,9 @@
             {% else %}
                 <h3>U heeft nog geen chats.</h3>
             {% endif %}
-        <form method=post action="/Chats/Create">
+        </div>
+        <p>Maak een nieuwe chat aan:</p>
+        <form hx-post="/Create", hx-target="#ChatList">
             <input type="hidden" name="Name" value="{{ naam }}">
             <input type="text" name="ChatName" placeholder="Naam van de chat" required>
             <input type="text" name="Members" placeholder="Leden van de chat, gescheiden door een komma" required>

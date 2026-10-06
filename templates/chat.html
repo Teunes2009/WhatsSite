@@ -16,7 +16,7 @@
                     <p>{{ Message.Name }}: {{ Message.Text }}</p>
                 {% endfor %}
             {% else %}
-                <h3>Er zijn nog geen berichten verstuurd.</h3>
+                <h3>U hebt nog geen chats.</h3>
             {% endif %}
         </div>
         <form hx-post="/Chats/Send" hx-target="#MessageBox">
