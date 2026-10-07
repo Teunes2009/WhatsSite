@@ -27,7 +27,10 @@ templates = Jinja2Templates(directory="templates")
 #         db.commit()
 
 # with SqliteDict("Messages.db") as db:
-#     del 
+#     for chat in db:
+#         print(chat, db[chat])
+#     del db["Test"]
+#     db.commit()
 
 @app.get("/")
 async def home():
@@ -87,26 +90,33 @@ async def login(request: Request, naam: str = Form(...)):
 @app.post("/Create")
 async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Members: str = Form(...)):
     print("Creating chat", ChatName, "with members", Members, "by", Name)
+    # with SqliteDict("Chats.db") as db:
+    #     print(db.keys(), ChatName, db.get_key(ChatName, []), "hoi")
     with SqliteDict("Messages.db") as db:
-        if ChatName in db:
-            raise HTTPException(status_code=400, detail="Chat already exists")
-        if ChatName in ["Main", "Send", "GetMessages", ""]:
+        print(db.keys(), db.get(ChatName, [1]), "hoi", ChatName in db)
+        if ChatName.strip() in db:
+            raise HTTPException(status_code=400, detail=f"{ChatName} already exists, {db.get(ChatName, [])}")
+        if ChatName.strip() in ["Main", "Send", "GetMessages", ""]:
             raise HTTPException(status_code=400, detail="Chat name is invalid")
         db[ChatName] = []
+        print(db[ChatName], "created chat", ChatName)
         db.commit()
     with SqliteDict("Chats.db") as db:
         NewMembers = [Name]
         for Member in Members.split(","):
+            print(Member, Member in db)
             if Member in db:
                 NewMembers.append(Member)
                 db[Member].append(ChatName)
+        print("New members:", NewMembers)
         db[Name].append(ChatName)
         print(db[Name], NewMembers)
+        Chats = db[Name]
         db.commit()
     return templates.TemplateResponse(
         request,
         "ChatList.html",
-        {"naam": Name, "Messages": db[Name]}
+        {"naam": Name, "Messages": Chats}
     )
 
 @app.post("/GetChats")

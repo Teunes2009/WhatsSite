@@ -6,4 +6,6 @@ with SqliteDict("Messages.db") as db:
         print(chat)
         db[chat] = []
         print(db[chat])
+        if chat == "Test":
+            del db[chat]
     db.commit()
