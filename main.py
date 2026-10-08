@@ -89,28 +89,37 @@ async def login(request: Request, naam: str = Form(...)):
 
 @app.post("/Create")
 async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Members: str = Form(...)):
+    ChatName = ChatName.strip()
     print("Creating chat", ChatName, "with members", Members, "by", Name)
     # with SqliteDict("Chats.db") as db:
     #     print(db.keys(), ChatName, db.get_key(ChatName, []), "hoi")
     with SqliteDict("Messages.db") as db:
-        print(db.keys(), db.get(ChatName, [1]), "hoi", ChatName in db)
+        print(list(db.keys()), db.get(ChatName, [1]), "hoi", ChatName in db)
         if ChatName.strip() in db:
-            raise HTTPException(status_code=400, detail=f"{ChatName} already exists, {db.get(ChatName, [])}")
-        if ChatName.strip() in ["Main", "Send", "GetMessages", ""]:
-            raise HTTPException(status_code=400, detail="Chat name is invalid")
+            raise HTTPException(status_code=404, detail=f"{ChatName} already exists, {db.get(ChatName, [])}")
+        if ChatName in ["Main", "Send", "GetMessages", "NewMember", "Leave", ""]:
+            raise HTTPException(status_code=404, detail="Chat name is invalid")
         db[ChatName] = []
         print(db[ChatName], "created chat", ChatName)
         db.commit()
     with SqliteDict("Chats.db") as db:
         NewMembers = [Name]
         for Member in Members.split(","):
+            Member = Member.strip()
             print(Member, Member in db)
             if Member in db:
+                Chats = db[Member]
+                Chats.append(ChatName)
+                db[Member] = Chats
                 NewMembers.append(Member)
-                db[Member].append(ChatName)
+                # db[Member].append(ChatName)
         print("New members:", NewMembers)
-        db[Name].append(ChatName)
-        print(db[Name], NewMembers)
+        print(db[Name], ChatName)
+        Chats = db[Name]
+        Chats.append(ChatName)
+        db[Name] = Chats
+        # db[Name].append(ChatName)
+        print(db[Name], NewMembers, ChatName, "added chat", ChatName, "to members", NewMembers)
         Chats = db[Name]
         db.commit()
     return templates.TemplateResponse(
@@ -122,7 +131,7 @@ async def create_chat(request: Request, ChatName: str = Form(...), Name: str = F
 @app.post("/GetChats")
 async def get_chats(request: Request, Name: str = Form(...)):
     with SqliteDict("Chats.db") as db:
-        print(db.keys(), Name, db[Name], db.get(Name, []))
+        print(list(db.keys()), Name, db[Name], db.get(Name, []))
         CurrentChats = db.get(Name, [])
     print(CurrentChats)
     return templates.TemplateResponse(
@@ -136,7 +145,7 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
     print(Name, "sent ", Message, "in", ChatName)
     print(Message, ChatName, Name)
     with SqliteDict("Messages.db") as db:
-        print(db.keys())
+        print(list(db.keys()))
         if ChatName not in db:
             db[ChatName] = []
         Messages = db[ChatName]
@@ -146,21 +155,73 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"ChatName": ChatName, "Messages": Messages}
+        {"Messages": Messages}
     )
 
 @app.post("/Chats/GetMessages")
 async def get_messages(request: Request, ChatName: str = Form(...)):
     print(ChatName)
     with SqliteDict("Messages.db") as db:
-        if ChatName not in db:
-            db[ChatName] = []
-        Messages = db[ChatName]
+        Messages = db.get(ChatName, [])
         # print(Messages)
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"ChatName": ChatName, "Messages": Messages}
+        {"Messages": Messages}
+    )
+
+@app.post("/Chats/NewMember")
+async def new_member(request: Request, ChatName: str = Form(...), NewMember: str = Form(...), Name: str = Form(...)):
+    Members = []
+    print(Name, "added", NewMember, "to", ChatName)
+    with SqliteDict("Chats.db") as db:
+        if ChatName not in db[NewMember]:
+            Chats = db[NewMember]
+            Chats.append(ChatName)
+            db[NewMember] = Chats
+            # db[NewMember].append(ChatName)
+            db.commit()
+            for Member in db.keys():
+                if ChatName in db[Member]:
+                    Members.append(Member)
+    return templates.TemplateResponse(
+        request,
+        "Members.html",
+        {"Members": Members}
+    )
+
+@app.post("/Chats/GetMembers")
+async def get_members(request: Request, ChatName: str = Form(...)):
+    Members = []
+    print(ChatName)
+    with SqliteDict("Chats.db") as db:
+        for Member in db.keys():
+            if ChatName in db[Member]:
+                Members.append(Member)
+    return templates.TemplateResponse(
+        request,
+        "Members.html",
+        {"Members": Members}
+    )
+
+@app.post("/Chats/Leave")
+async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...)):
+    print(Name, "left", ChatName)
+    if ChatName == "Main":
+        raise HTTPException(status_code=404, detail="You cannot leave the Main chat")
+    Chats = []
+    with SqliteDict("Chats.db") as db:
+        if ChatName in db[Name]:
+            Chats = db[Name]
+            Chats.remove(ChatName)
+            db[Name] = Chats
+            # db[Name].remove(ChatName)
+            db.commit()
+        # Chats = db.get(Name, [])
+    return templates.TemplateResponse(
+        request,
+        "ingelogd.html",
+        {"naam": Name, "Messages": Chats}
     )
 
 @app.post("/Chats/{ChatName}")
@@ -171,11 +232,17 @@ async def chat(request: Request, ChatName: str, Name: str = Form(...)):
             db.commit()
         Messages = db[ChatName]
         print(Messages)
-        return templates.TemplateResponse(
-            request,
-            "chat.html",
-            {"ChatName": ChatName, "Messages": Messages, "Name": Name}
-        )
+    with SqliteDict("Chats.db") as db:
+        Members = []
+        for Member in db.keys():
+            if ChatName in db[Member]:
+                Members.append(Member)
+        print(Members)
+    return templates.TemplateResponse(
+        request,
+        "chat.html",
+        {"ChatName": ChatName, "Messages": Messages, "Name": Name, "Members": Members}
+    )
 
 @app.post("/admin")
 async def admin(request: Request):

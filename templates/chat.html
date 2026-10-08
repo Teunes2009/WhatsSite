@@ -25,5 +25,27 @@
             <input type="text" name="Message" placeholder="Typ je bericht hier..." required>
             <button type="submit">Verstuur</button>
         </form>
+        <br>
+        <h3>Leden van deze chat:</h3>
+        <div id="MembersBox" hx-post="/Chats/GetMembers" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}"}' hx-target="#MembersBox">
+            <ul>
+                {% for Member in Members %}
+                    <li>{{ Member }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <form hx-post="/Chats/NewMember" hx-target="#MembersBox">
+            <input type="hidden" name="Name" value="{{ Name }}">
+            <input type="hidden" name="ChatName" value="{{ ChatName }}">
+            <input type="text" name="NewMember" placeholder="Voeg een nieuw lid toe..." required>
+            <button type="submit">Voeg lid toe</button>
+        </form>
+        {% if ChatName != "Main" %}
+            <form method="post" action="/Chats/Leave">
+                <input type="hidden" name="Name" value="{{ Name }}">
+                <input type="hidden" name="ChatName" value="{{ ChatName }}">
+                <button type="submit">Verlaat Chat</button>
+            </form>
+        {% endif %}
     </body>
 </html>
