@@ -1,15 +1,17 @@
-from fastapi import FastAPI, Form, Request, HTTPException, Query
+from fastapi import FastAPI, Form, Request, HTTPException, Query, Cookie
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpcore import request
 from sqlitedict import SqliteDict
+import secrets
 
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+COOKIES_MAX_LIFETIME = 60 * 60 * 24 * 30
 # with SqliteDict("wachtwoorden.db") as db:
 #     with SqliteDict("Messages.db") as db:
 
@@ -81,11 +83,17 @@ async def login(request: Request, naam: str = Form(...)):
             Messages[Chat] = db[Chat]
         print(Messages)
         # messages = db[naam].get("", [])
-    return templates.TemplateResponse(
+    SessionID = secrets.token_hex(16)
+    with SqliteDict("sessions.db") as db:
+        db[SessionID] = naam
+        db.commit()
+    Response = templates.TemplateResponse(
         request,
         "ingelogd.html",
         {"naam": naam, "Messages": Messages}
     )
+    Response.set_cookie(key="UserID", value=SessionID, max_age=COOKIES_MAX_LIFETIME, httponly=True)
+    return Response
 
 @app.post("/Create")
 async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Members: str = Form(...)):
@@ -141,9 +149,12 @@ async def get_chats(request: Request, Name: str = Form(...)):
     )
 
 @app.post("/Chats/Send")
-async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Form(...)):
+async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Form(...), Cookie: str = Cookie(default="")):
     print(Name, "sent ", Message, "in", ChatName)
     print(Message, ChatName, Name)
+    with SqliteDict("sessions.db") as db:
+        if db.get(Cookie) != Name:
+            raise HTTPException(status_code=404, detail="Invalide sessie")
     with SqliteDict("Messages.db") as db:
         print(list(db.keys()))
         if ChatName not in db:
@@ -159,8 +170,12 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
     )
 
 @app.post("/Chats/GetMessages")
-async def get_messages(request: Request, ChatName: str = Form(...)):
+async def get_messages(request: Request, ChatName: str = Form(...), Cookie: str = Cookie(default="")):
     print(ChatName)
+    with SqliteDict("Chats.db") as db:
+        with SqliteDict("sessions.db") as dbS:
+            if dbS.get(Cookie) not in db.get(ChatName):
+                raise HTTPException(status_code=404, detail="Invalide sessie")
     with SqliteDict("Messages.db") as db:
         Messages = db.get(ChatName, [])
         # print(Messages)
@@ -171,7 +186,7 @@ async def get_messages(request: Request, ChatName: str = Form(...)):
     )
 
 @app.post("/Chats/NewMember")
-async def new_member(request: Request, ChatName: str = Form(...), NewMember: str = Form(...), Name: str = Form(...)):
+async def new_member(request: Request, ChatName: str = Form(...), NewMember: str = Form(...), Name: str = Form(...), Cookie: str = Cookie(default="")):
     Members = []
     print(Name, "added", NewMember, "to", ChatName)
     with SqliteDict("Chats.db") as db:
@@ -225,7 +240,7 @@ async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Fo
     )
 
 @app.post("/Chats/{ChatName}")
-async def chat(request: Request, ChatName: str, Name: str = Form(...)):
+async def chat(request: Request, ChatName: str, Name: str = Form(...), Cookie: str = Cookie(default="")):
     with SqliteDict("Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
