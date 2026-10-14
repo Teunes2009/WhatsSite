@@ -2,11 +2,19 @@ from fastapi import FastAPI, Form, Request, HTTPException, Query, Cookie
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from httpcore import request
 from sqlitedict import SqliteDict
 import secrets
 
-app = FastAPI()
+
+limiter = Limiter(key_func=get_remote_address)
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -51,7 +59,8 @@ async def about():
 #     return {"je zocht naar": term}
 
 @app.post("/verstuur")
-async def verstuur(request: Request, naam: str = Form(...), wachtwoord: str = Form(...)):
+@limiter.limit("3/minute")
+async def verstuur(request: Request, naam: str = Form(..., max_length=25), wachtwoord: str = Form(..., min_length=5)):
     with SqliteDict("wachtwoorden.db") as db:
         print(naam, wachtwoord)
         if naam == "Teun" and wachtwoord == "1":
@@ -65,6 +74,7 @@ async def verstuur(request: Request, naam: str = Form(...), wachtwoord: str = Fo
         db[naam] = {"wachtwoord": wachtwoord}
         db.commit()
     return RedirectResponse(url="/login")
+
 
 @app.post("/login")
 async def login(request: Request, naam: str = Form(...)):
@@ -96,7 +106,11 @@ async def login(request: Request, naam: str = Form(...)):
     return Response
 
 @app.post("/Create")
-async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Members: str = Form(...)):
+@limiter.limit("5/minute")
+async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Members: str = Form(...), Cookie: str = Cookie(default="")):
+    with SqliteDict("sessions.db") as db:
+        if db.get(Cookie) != Name:
+            raise HTTPException(status_code=404, detail="Invalide sessie")
     ChatName = ChatName.strip()
     print("Creating chat", ChatName, "with members", Members, "by", Name)
     # with SqliteDict("Chats.db") as db:
@@ -137,7 +151,11 @@ async def create_chat(request: Request, ChatName: str = Form(...), Name: str = F
     )
 
 @app.post("/GetChats")
-async def get_chats(request: Request, Name: str = Form(...)):
+@limiter.limit("35/minute")
+async def get_chats(request: Request, Name: str = Form(...), Cookie: str = Cookie(default="")):
+    with SqliteDict("sessions.db") as db:
+        if db.get(Cookie) != Name:
+            raise HTTPException(status_code=404, detail="Invalide sessie")
     with SqliteDict("Chats.db") as db:
         print(list(db.keys()), Name, db[Name], db.get(Name, []))
         CurrentChats = db.get(Name, [])
@@ -150,11 +168,12 @@ async def get_chats(request: Request, Name: str = Form(...)):
 
 @app.post("/Chats/Send")
 async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Form(...), Cookie: str = Cookie(default="")):
+    with SqliteDict("Chats.db") as db:
+        with SqliteDict("sessions.db") as dbS:
+            if dbS.get(Cookie) not in db.get(ChatName):
+                raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     print(Name, "sent ", Message, "in", ChatName)
     print(Message, ChatName, Name)
-    with SqliteDict("sessions.db") as db:
-        if db.get(Cookie) != Name:
-            raise HTTPException(status_code=404, detail="Invalide sessie")
     with SqliteDict("Messages.db") as db:
         print(list(db.keys()))
         if ChatName not in db:
@@ -170,12 +189,13 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
     )
 
 @app.post("/Chats/GetMessages")
+@limiter.limit("35/minute")
 async def get_messages(request: Request, ChatName: str = Form(...), Cookie: str = Cookie(default="")):
     print(ChatName)
     with SqliteDict("Chats.db") as db:
         with SqliteDict("sessions.db") as dbS:
             if dbS.get(Cookie) not in db.get(ChatName):
-                raise HTTPException(status_code=404, detail="Invalide sessie")
+                raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     with SqliteDict("Messages.db") as db:
         Messages = db.get(ChatName, [])
         # print(Messages)
@@ -187,6 +207,10 @@ async def get_messages(request: Request, ChatName: str = Form(...), Cookie: str 
 
 @app.post("/Chats/NewMember")
 async def new_member(request: Request, ChatName: str = Form(...), NewMember: str = Form(...), Name: str = Form(...), Cookie: str = Cookie(default="")):
+    with SqliteDict("Chats.db") as db:
+        with SqliteDict("sessions.db") as dbS:
+            if dbS.get(Cookie) not in db.get(ChatName):
+                raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     Members = []
     print(Name, "added", NewMember, "to", ChatName)
     with SqliteDict("Chats.db") as db:
@@ -205,8 +229,13 @@ async def new_member(request: Request, ChatName: str = Form(...), NewMember: str
         {"Members": Members}
     )
 
+@limiter.limit("35/minute")
 @app.post("/Chats/GetMembers")
-async def get_members(request: Request, ChatName: str = Form(...)):
+async def get_members(request: Request, ChatName: str = Form(...), Cookie: str = Cookie(default="")):
+    with SqliteDict("Chats.db") as db:
+        with SqliteDict("sessions.db") as dbS:
+            if dbS.get(Cookie) not in db.get(ChatName):
+                raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     Members = []
     print(ChatName)
     with SqliteDict("Chats.db") as db:
@@ -220,8 +249,13 @@ async def get_members(request: Request, ChatName: str = Form(...)):
     )
 
 @app.post("/Chats/Leave")
-async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...)):
+@limiter.limit("10/minute")
+async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Cookie: str = Cookie(default="")):
     print(Name, "left", ChatName)
+    with SqliteDict("Chats.db") as db:
+        with SqliteDict("sessions.db") as dbS:
+            if dbS.get(Cookie) not in db.get(ChatName):
+                raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     if ChatName == "Main":
         raise HTTPException(status_code=404, detail="You cannot leave the Main chat")
     Chats = []
@@ -239,8 +273,13 @@ async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Fo
         {"naam": Name, "Messages": Chats}
     )
 
+
 @app.post("/Chats/{ChatName}")
 async def chat(request: Request, ChatName: str, Name: str = Form(...), Cookie: str = Cookie(default="")):
+    with SqliteDict("Chats.db") as db:
+        with SqliteDict("sessions.db") as dbS:
+            if dbS.get(Cookie) not in db.get(ChatName):
+                raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     with SqliteDict("Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
@@ -259,6 +298,7 @@ async def chat(request: Request, ChatName: str, Name: str = Form(...), Cookie: s
         {"ChatName": ChatName, "Messages": Messages, "Name": Name, "Members": Members}
     )
 
+@limiter.limit("1/minute")
 @app.post("/admin")
 async def admin(request: Request):
     with SqliteDict("wachtwoorden.db") as db:
