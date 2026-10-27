@@ -58,28 +58,47 @@ async def about():
 # async def zoek(term: str):
 #     return {"je zocht naar": term}
 
-@app.post("/verstuur")
-@limiter.limit("3/minute")
-async def verstuur(request: Request, naam: str = Form(..., max_length=25), wachtwoord: str = Form(..., min_length=5)):
-    with SqliteDict("wachtwoorden.db") as db:
-        print(naam, wachtwoord)
-        if naam == "Teun" and wachtwoord == "1":
-            return RedirectResponse(url="/admin")
+# @app.post("/verstuur")
+# @limiter.limit("3/minute")
+# async def verstuur(request: Request, naam: str = Form(..., max_length=25), wachtwoord: str = Form(min_length=5)):
+#     with SqliteDict("wachtwoorden.db") as db:
+#         print(naam, wachtwoord)
+#         if naam == "Teun" and wachtwoord == "1":
+#             return RedirectResponse(url="/admin")
 
-        if naam in db:
-            if db[naam]["wachtwoord"] == wachtwoord:
-                return RedirectResponse(url="/login")
-            return RedirectResponse(url="/form", status_code=303)
+#         if naam in db:
+#             if db[naam]["wachtwoord"] == wachtwoord:
+#                 return RedirectResponse(url="/login")
+#             return RedirectResponse(url="/form", status_code=303)
 
-        db[naam] = {"wachtwoord": wachtwoord}
-        db.commit()
-    return RedirectResponse(url="/login")
+#         db[naam] = {"wachtwoord": wachtwoord}
+#         db.commit()
+#     return RedirectResponse(url="/login")
 
 
 @app.post("/login")
-async def login(request: Request, naam: str = Form(...)):
+@limiter.limit("3/minute")
+async def login(request: Request, action: str = Form(...), naam: str = Form(...), wachtwoord: str = Form(min_length=5)):
+    with SqliteDict("wachtwoorden.db") as db:
+            print(naam, wachtwoord)
+            if naam == "Teun" and wachtwoord == "1":
+                return RedirectResponse(url="/admin")
+    
+            if naam in db:
+                if action == "inloggen":
+                    if db[naam]["wachtwoord"] == wachtwoord:
+                        return RedirectResponse(url="/login")
+                    raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
+                raise HTTPException(status_code=403, detail="Ongeldige actie")
+            else:
+                if action == "inloggen":
+                    raise HTTPException(status_code=404, detail=f"gebruiker {naam} bestaat niet")
+                db[naam] = {"wachtwoord": wachtwoord}
+                db.commit()
     with SqliteDict("Chats.db") as db:
         if naam not in db:
+            if action == "inloggen":
+                raise HTTPException(status_code=404, detail=f"gebruiker {naam} bestaat niet")
             db[naam] = ["Main"]
             db.commit()
         CurrentChats = db[naam]
@@ -88,6 +107,8 @@ async def login(request: Request, naam: str = Form(...)):
         Messages = {}
         for Chat in CurrentChats:
             if Chat not in db:
+                if action == "inloggen":
+                    raise HTTPException(status_code=404, detail=f"Chat {Chat} bestaat niet")
                 db[Chat] = []
                 db.commit()
             Messages[Chat] = db[Chat]
@@ -100,17 +121,20 @@ async def login(request: Request, naam: str = Form(...)):
     Response = templates.TemplateResponse(
         request,
         "ingelogd.html",
-        {"naam": naam, "Messages": Messages}
+        {"naam": naam, "wachtwoord": wachtwoord, "Messages": Messages}
     )
     Response.set_cookie(key="UserID", value=SessionID, max_age=COOKIES_MAX_LIFETIME, httponly=True)
     return Response
 
 @app.post("/Create")
 @limiter.limit("5/minute")
-async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Members: str = Form(...), Cookie: str = Cookie(default="")):
+async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Members: str = Form(...), Cookie: str = Cookie(default="")):
     with SqliteDict("sessions.db") as db:
         if db.get(Cookie) != Name:
             raise HTTPException(status_code=404, detail="Invalide sessie")
+    with SqliteDict("wachtwoorden.db") as db:
+        if db.get(Name, {}).get("wachtwoord") != Password:
+            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
     ChatName = ChatName.strip()
     print("Creating chat", ChatName, "with members", Members, "by", Name)
     # with SqliteDict("Chats.db") as db:

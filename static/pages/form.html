@@ -8,7 +8,7 @@
             <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
         </nav>
         <h1>Wat is je naam?</h1>
-        <form method="post" action="/verstuur" display="block">
+        <form method="post" action="/login" display="block">
             <label for="naam">Wat is je naam?</label>
             <input type="text" id="naam" name="naam" maxlength="25" placeholder="Maximaal 25 tekens" required><br>
 
@@ -23,7 +23,7 @@
 
             <label for="wachtwoord">Wat is je wachtwoord?</label>
             <input type="password" id="wachtwoord" name="wachtwoord" minlength="5" placeholder="Minimaal 5 tekens" required><br>
-            <button type="submit">Verstuur</button>
+            <button type="submit" value="inloggen">Verstuur</button>   <button type="submit" value="creëer">Account aanmaken</button>
         </form>
     </body>
 </html>
