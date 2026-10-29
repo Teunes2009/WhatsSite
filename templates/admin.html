@@ -10,15 +10,20 @@
             <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
         </nav>
         <h1>Adminpaneel</h1>
-        <p>Dit zijn de gebruikers en hun wachtwoorden.</p>
-            {% if info %}
-                <ul>
-                {% for persoon, wachtwoord in info %}
-                    <li>{{ persoon }}: Wachtwoord: {{ wachtwoord.wachtwoord }}</li>
-                {% endfor %}
-                </ul>
-            {% else %}
-                <h3>Nog geen gebruikers.</h3>
-            {% endif %}
+        <p>Dit zijn alle chats:</p>
+        <div id="ChatList" hx-post="/GetAllChats" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"Name":"{{ naam }}", "Password":"{{ wachtwoord }}"}' hx-target="#ChatList">
+            <ul>
+            {% for ChatName in Messages %}
+                <li>
+                    <form method=post action="/Admin/{{ ChatName }}">
+                        <input type="hidden" name="Name" value="{{ naam }}">
+                        <input type="hidden" name="Password" value="{{ wachtwoord }}">
+                        <input type="hidden" name="ChatName" value="{{ ChatName }}">
+                        <button type="submit">{{ ChatName }}</button>
+                    </form>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
     </body>
 </html>

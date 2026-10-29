@@ -6,11 +6,8 @@
         <script src="/static/js/htmx.min.js"></script>
     </head>
     <body>
-        <nav>
-            <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
-        </nav>
         <h1>{{ChatName}}</h1>
-        <div id="MessageBox" hx-post="/Chats/GetMessages" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}"}' hx-target="#MessageBox">
+        <div id="MessageBox" hx-post="/GetMessages" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}", "Name":"{{Name}}", "Password":"{{Password}}"}' hx-target="#MessageBox">
             {% if Messages %}
                 {% for Message in Messages %}
                     <p>{{ Message.Name }}: {{ Message.Text }}</p>
@@ -19,30 +16,33 @@
                 <h3>U hebt nog geen chats.</h3>
             {% endif %}
         </div>
-        <form hx-post="/Chats/Send" hx-target="#MessageBox">
+        <form hx-post="/Send" hx-target="#MessageBox">
             <input type="hidden" name="Name" value="{{ Name }}">
+            <input type="hidden" name="Password" value="{{ Password }}">
             <input type="hidden" name="ChatName" value="{{ ChatName }}">
             <input type="text" name="Message" placeholder="Typ je bericht hier..." required>
             <button type="submit">Verstuur</button>
         </form>
         <br>
         <h3>Leden van deze chat:</h3>
-        <div id="MembersBox" hx-post="/Chats/GetMembers" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}"}' hx-target="#MembersBox">
+        <div id="MembersBox" hx-post="/GetMembers" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}", "Name":"{{Name}}", "Password":"{{Password}}"}' hx-target="#MembersBox">
             <ul>
                 {% for Member in Members %}
                     <li>{{ Member }}</li>
                 {% endfor %}
             </ul>
         </div>
-        <form hx-post="/Chats/NewMember" hx-target="#MembersBox">
+        <form hx-post="/NewMember" hx-target="#MembersBox">
             <input type="hidden" name="Name" value="{{ Name }}">
+            <input type="hidden" name="Password" value="{{ Password }}">
             <input type="hidden" name="ChatName" value="{{ ChatName }}">
             <input type="text" name="NewMember" placeholder="Voeg een nieuw lid toe..." required>
             <button type="submit">Voeg lid toe</button>
         </form>
         {% if ChatName != "Main" %}
-            <form method="post" action="/Chats/Leave">
+            <form method="post" action="/Leave">
                 <input type="hidden" name="Name" value="{{ Name }}">
+                <input type="hidden" name="Password" value="{{ Password }}">
                 <input type="hidden" name="ChatName" value="{{ ChatName }}">
                 <button type="submit">Verlaat Chat</button>
             </form>
