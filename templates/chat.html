@@ -32,6 +32,7 @@
                 {% endfor %}
             </ul>
         </div>
+        <br>
         <form hx-post="/NewMember" hx-target="#MembersBox">
             <input type="hidden" name="Name" value="{{ Name }}">
             <input type="hidden" name="Password" value="{{ Password }}">

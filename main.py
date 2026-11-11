@@ -25,7 +25,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 COOKIES_MAX_LIFETIME = 60 * 60 * 24 * 30
-Admins = ["Teun"]
+Admins = ["Teun", "Admin"]
 # with SqliteDict("wachtwoorden.db") as db:
 #     with SqliteDict("Messages.db") as db:
 
@@ -60,31 +60,10 @@ async def project():
 async def about():
     return FileResponse("static/pages/about.html")
 
-# @app.get("/zoek")
-# async def zoek(term: str):
-#     return {"je zocht naar": term}
-
-# @app.post("/verstuur")
-# @limiter.limit("3/minute")
-# async def verstuur(request: Request, naam: str = Form(..., max_length=25), wachtwoord: str = Form(min_length=5)):
-#     with SqliteDict("wachtwoorden.db") as db:
-#         print(naam, wachtwoord)
-#         if naam == "Teun" and wachtwoord == "1":
-#             return RedirectResponse(url="/admin")
-
-#         if naam in db:
-#             if db[naam]["wachtwoord"] == wachtwoord:
-#                 return RedirectResponse(url="/login")
-#             return RedirectResponse(url="/form", status_code=303)
-
-#         db[naam] = {"wachtwoord": wachtwoord}
-#         db.commit()
-#     return RedirectResponse(url="/login")
-
 
 @app.post("/login")
 @limiter.limit("3/minute")
-async def login(request: Request, action: str = Form(...), naam: str = Form(...), wachtwoord: str = Form(min_length=5)):
+async def login(request: Request, action: str = Form(...), naam: str = Form(...), wachtwoord: str = Form(min_length=4)):
     with SqliteDict("wachtwoorden.db") as db:
         print(naam, wachtwoord)
         if naam in db:
@@ -133,12 +112,7 @@ async def login(request: Request, action: str = Form(...), naam: str = Form(...)
 @app.post("/logout")
 @limiter.limit("3/minute")
 async def logout(request: Request, Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("sessions.db") as db:
         del db[Cookie]
         db.commit()
@@ -149,12 +123,7 @@ async def logout(request: Request, Name: str = Form(...), Password: str = Form(.
 @app.post("/Create")
 @limiter.limit("5/minute")
 async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Members: str = Form(...), Cookie: str = Cookie(default="")):
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
+    IsValidUser(Name, Password, Cookie)
     ChatName = ChatName.strip()
     print("Creating chat", ChatName, "with members", Members, "by", Name)
     # with SqliteDict("Chats.db") as db:
@@ -194,15 +163,45 @@ async def create_chat(request: Request, ChatName: str = Form(...), Name: str = F
         {"naam": Name, "Messages": Chats}
     )
 
+@app.post("/CreateAdmin")
+async def create_admin_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Members: str = Form(...), Cookie: str = Cookie(default="")):
+    IsValidAdmin(Name, Password, Cookie)
+    ChatName = ChatName.strip()
+    with SqliteDict("Messages.db") as db:
+        print(list(db.keys()), db.get(ChatName, [1]), "hoi", ChatName in db)
+        if ChatName.strip() in db:
+            raise HTTPException(status_code=404, detail=f"{ChatName} already exists, {db.get(ChatName, [])}")
+        if ChatName in ["Main", "Send", "GetMessages", "NewMember", "Leave", ""]:
+            raise HTTPException(status_code=404, detail="Chat name is invalid")
+        db[ChatName] = []
+        print(db[ChatName], "created chat", ChatName)
+        db.commit()
+    with SqliteDict("Chats.db") as db:
+        NewMembers = []
+        for Member in Members.split(","):
+            Member = Member.strip()
+            print(Member, Member in db)
+            if Member in db:
+                Chats = db[Member]
+                Chats.append(ChatName)
+                db[Member] = Chats
+                NewMembers.append(Member)
+                # db[Member].append(ChatName)
+        print("New members:", NewMembers)
+        print(db[Name], ChatName)
+        db.commit()
+    with SqliteDict("Messages.db") as db:
+        Messages = db[ChatName]
+    return templates.TemplateResponse(
+        request,
+        "ChatList.html",
+        {"naam": Name, "Messages": Messages}
+    )
+
 @app.post("/GetChats")
 @limiter.limit("35/minute")
 async def get_chats(request: Request, Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("Chats.db") as db:
         print(list(db.keys()), Name, db[Name], db.get(Name, []))
         CurrentChats = db.get(Name, [])
@@ -216,13 +215,8 @@ async def get_chats(request: Request, Name: str = Form(...), Password: str = For
 @app.post("/GetAllChats")
 @limiter.limit("35/minute")
 async def get_all_chats(request: Request, Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
-    with SqliteDict("Chats.db") as db:
+    IsValidAdmin(Name, Password, Cookie)
+    with SqliteDict("Messages.db") as db:
         CurrentChats = list(db.keys())
     print(CurrentChats)
     return templates.TemplateResponse(
@@ -233,12 +227,7 @@ async def get_all_chats(request: Request, Name: str = Form(...), Password: str =
 
 @app.post("/Send")
 async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...),  Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest()  :
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("Chats.db") as db:
         if Name not in db.get(ChatName, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -261,12 +250,7 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
 @app.post("/GetMessages")
 @limiter.limit("35/minute")
 async def get_messages(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("Chats.db") as db:
         if Name not in db.get(ChatName, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -281,12 +265,7 @@ async def get_messages(request: Request, ChatName: str = Form(...), Name: str = 
 
 @app.post("/NewMember")
 async def new_member(request: Request, Name: str = Form(...), Password: str = Form(...), ChatName: str = Form(...), NewMember: str = Form(...), Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("Chats.db") as db:
         if Name not in db.get(ChatName, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -311,12 +290,7 @@ async def new_member(request: Request, Name: str = Form(...), Password: str = Fo
 @limiter.limit("35/minute")
 @app.post("/GetMembers")
 async def get_members(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("Chats.db") as db:
         if Name not in db.get(ChatName, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -335,13 +309,7 @@ async def get_members(request: Request, ChatName: str = Form(...), Name: str = F
 @app.post("/Leave")
 @limiter.limit("10/minute")
 async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
-    print(Name, "left", ChatName)
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("Chats.db") as db:
         if Name not in db.get(ChatName, []):
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -364,16 +332,11 @@ async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Fo
 
 
 @app.post("/Chats/{ChatName}")
-async def chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
+async def chat(request: Request, ChatName: str, Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
+    IsValidUser(Name, Password, Cookie)
     with SqliteDict("Chats.db") as db:
         if Name not in db.get(ChatName, []):
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
     with SqliteDict("Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
@@ -393,13 +356,8 @@ async def chat(request: Request, ChatName: str = Form(...), Name: str = Form(...
     )
 
 @app.post("/Admin/{ChatName}")
-async def admin_chat(request: Request, ChatName: str = Form(...), Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
-    sessie = sessie_ophalen(Cookie)
-    if not sessie:
-        raise HTTPException(status_code=404, detail="Invalide sessie")
-    with SqliteDict("wachtwoorden.db") as db:
-        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
-            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
+async def admin_chat(request: Request, ChatName: str, Name: str = Form(...), Password: str = Form(...), Cookie: str = Cookie(default="")):
+    IsValidAdmin(Name, Password, Cookie)
     with SqliteDict("Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
@@ -445,3 +403,16 @@ def sessie_ophalen(sessie_id: str):
             sessies.commit()
             return {}
     return mijn
+
+def IsValidUser(Name: str, Password: str, Cookie: str):
+    with SqliteDict("wachtwoorden.db") as db:
+        if db.get(Name, {}).get("wachtwoord") != hashlib.sha256(Password.encode()).hexdigest():
+            raise HTTPException(status_code=403, detail="Ongeldig wachtwoord")
+    sessie = sessie_ophalen(Cookie)
+    if not sessie:
+        raise HTTPException(status_code=404, detail="Invalide sessie")
+
+def IsValidAdmin(Name: str, Password: str, Cookie: str):
+    IsValidUser(Name, Password, Cookie)
+    if Name not in Admins:
+        raise HTTPException(status_code=403, detail="Je bent geen admin")
