@@ -1,6 +1,6 @@
 {% if Messages %}
     {% for Message in Messages %}
-        <p>{{ Message.Name }}: {{ Message.Text }}</p>
+        <p>{{ Message.Name }}: {{ Message.Text|safe }}</p>
     {% endfor %}
 {% else %}
     <h3>U hebt nog geen chats.</h3>
