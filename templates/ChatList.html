@@ -2,7 +2,6 @@
 {% for ChatName in Messages %}
     <li>
         <form method=post action="/Chats/{{ ChatName }}">
-            <input type="hidden" name="Name" value="{{ naam }}">
             <input type="hidden" name="ChatName" value="{{ ChatName }}">
             <button type="submit">{{ ChatName }}</button>
         </form>

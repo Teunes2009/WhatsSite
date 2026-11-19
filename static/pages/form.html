@@ -5,25 +5,16 @@
     </head>
     <body>
         <nav>
-            <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Project</a>
+            <a href="/">Home</a> | <a href="/about">Over Mij</a> | <a href="/project">Inloggen</a>
         </nav>
-        <h1>Wat is je naam?</h1>
+        <h1>Inloggen</h1>
         <form method="post" action="/login" display="block">
             <label for="naam">Wat is je naam?</label>
             <input type="text" id="naam" name="naam" maxlength="25" placeholder="Maximaal 25 tekens" required><br>
 
-            <!-- <label for="leeftijd">Wat is je leeftijd?</label>
-            <input type="number" id="leeftijd" name="leeftijd"><br>
-
-            <label for="email">Wat is je emailadres?</label>
-            <input type="email" id="email" name="email"><br>
-
-            <label for="bankkaartnummer">Wat is je bankkaartnummer?</label>
-            <input type="text" id="bankkaartnummer" name="bankkaartnummer"><br> -->
-
             <label for="wachtwoord">Wat is je wachtwoord?</label>
             <input type="password" id="wachtwoord" name="wachtwoord" minlength="4" placeholder="Minimaal 4 tekens" required><br>
-            <button type="submit" name="action" value="inloggen">Verstuur</button>   <button type="submit" name="action" value="creëer">Account aanmaken</button>
+            <button type="submit" name="action" value="inloggen">Inloggen</button>     <button type="submit" name="action" value="creëer">Account aanmaken</button>
         </form>
     </body>
 </html>

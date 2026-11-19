@@ -4,6 +4,7 @@
         <title>Home</title>
         <link rel="stylesheet" href="/static/css/style.css">
         <script src="/static/js/htmx.min.js"></script>
+        <script src="/static/js/app.js" defer></script>
     </head>
     <body>
         <nav>
@@ -11,13 +12,11 @@
         </nav>
         <h1>Adminpaneel</h1>
         <p>Dit zijn alle chats:</p>
-        <div id="ChatList" hx-post="/GetAllChats" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"Name":"{{ naam }}", "Password":"{{ wachtwoord }}"}' hx-target="#ChatList">
+        <div id="ChatList" hx-post="/GetAllChats" hx-trigger="every 2s, visibilitychange from:body" hx-target="#ChatList">
             <ul>
                 {% for ChatName in Messages %}
                     <li>
                         <form method=post action="/Admin/{{ ChatName }}">
-                            <input type="hidden" name="Name" value="{{ naam }}">
-                            <input type="hidden" name="Password" value="{{ wachtwoord }}">
                             <input type="hidden" name="ChatName" value="{{ ChatName }}">
                             <button type="submit">{{ ChatName }}</button>
                         </form>
@@ -27,16 +26,12 @@
         </div>
         <p>Maak een nieuwe chat aan:</p>
         <form hx-post="/AdminCreate" hx-target="#ChatList">
-            <input type="hidden" name="Name" value="{{ naam }}">
-            <input type="hidden" name="Password" value="{{ wachtwoord }}">
             <input type="text" name="ChatName" placeholder="Naam van de chat" required>
             <input type="text" name="Members" placeholder="Leden van de chat, gescheiden door een komma" required>
-            <button type="submit">Nieuwe Chat</button>
+            <button type="submit" class="ResetButton">Nieuwe Chat</button>
         </form>
         <br>
         <form method="post" action="/logout">
-            <input type="hidden" name="Name" value="{{ naam }}">
-            <input type="hidden" name="Password" value="{{ wachtwoord }}">
             <button type="submit">Uitloggen</button>
         </form>
     </body>

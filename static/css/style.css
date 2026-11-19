@@ -1,12 +1,14 @@
-h1 {
-    color: blue;
+#MessageList {
+    height: 400px;
+    overflow-y: scroll;
+    border: 3px solid #000;
+    border-radius: 8px;
+    padding: 10px;
 }
 
-p {
-    color: gray;
-}
-
-body {
-    background-color: red;
-    color: aqua;
+.message {
+    border: 1px solid #017730b1;
+    border-radius: 5px;
+    padding: 5px 0;
+    background-color: #01bd4cb1;
 }

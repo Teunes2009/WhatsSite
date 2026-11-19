@@ -4,28 +4,31 @@
         <title>Home</title>
         <link rel="stylesheet" href="/static/css/style.css">
         <script src="/static/js/htmx.min.js"></script>
+        <script src="/static/js/app.js" defer></script>
     </head>
     <body>
+        <form method="post" action="/GoBack">
+            <button type="submit">Terug naar chats</button>
+        </form>
         <h1>{{ChatName}}</h1>
-        <div id="MessageBox" hx-post="/GetMessages" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}", "Name":"{{Name}}", "Password":"{{Password}}"}' hx-target="#MessageBox">
-            {% if Messages %}
-                {% for Message in Messages %}
-                    <p>{{ Message.Name }}: {{ Message.Text }}</p>
-                {% endfor %}
-            {% else %}
-                <h3>U hebt nog geen chats.</h3>
-            {% endif %}
+        <div id="MessageBox" hx-post="/GetMessages" hx-trigger="every 2s, visibilitychange from:body" hx-vals='js:{"ChatName": {{ ChatName | tojson }}, "AfterID": Number(document.querySelector("#MessageList .message:last-child")?.dataset.messageId ?? -2)}' hx-target="#MessageList" hx-swap="beforeend">
+            <div id="MessageList">
+                {% include "Message.html" %}
+            </div>
         </div>
-        <form hx-post="/Send" hx-target="#MessageBox">
-            <input type="hidden" name="Name" value="{{ Name }}">
-            <input type="hidden" name="Password" value="{{ Password }}">
+        <form hx-post="/Send" hx-target="#MessageList" hx-swap="beforeend">
             <input type="hidden" name="ChatName" value="{{ ChatName }}">
             <input type="text" name="Message" placeholder="Typ je bericht hier..." required>
-            <button type="submit">Verstuur</button>
+            <button type="submit" class="ResetButton">Verstuur</button>
+        </form>
+        <form hx-post="/SendFile" hx-target="#MessageList" hx-swap="beforeend" enctype="multipart/form-data">
+            <input type="hidden" name="ChatName" value="{{ ChatName }}">
+            <input type="file" name="UploadedFile" placeholder="Selecteer een bestand..." required>
+            <button type="submit" class="ResetButton">Verstuur bestand</button>
         </form>
         <br>
         <h3>Leden van deze chat:</h3>
-        <div id="MembersBox" hx-post="/GetMembers" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}", "Name":"{{Name}}", "Password":"{{Password}}"}' hx-target="#MembersBox">
+        <div id="MembersBox" hx-post="/GetMembers" hx-trigger="every 2s, visibilitychange from:body" hx-vals='{"ChatName":"{{ChatName}}"}' hx-target="#MembersBox">
             <ul>
                 {% for Member in Members %}
                     <li>{{ Member }}</li>
@@ -34,16 +37,12 @@
         </div>
         <br>
         <form hx-post="/NewMember" hx-target="#MembersBox">
-            <input type="hidden" name="Name" value="{{ Name }}">
-            <input type="hidden" name="Password" value="{{ Password }}">
             <input type="hidden" name="ChatName" value="{{ ChatName }}">
             <input type="text" name="NewMember" placeholder="Voeg een nieuw lid toe..." required>
-            <button type="submit">Voeg lid toe</button>
+            <button type="submit" class="ResetButton">Voeg lid toe</button>
         </form>
         {% if ChatName != "Main" %}
             <form method="post" action="/Leave">
-                <input type="hidden" name="Name" value="{{ Name }}">
-                <input type="hidden" name="Password" value="{{ Password }}">
                 <input type="hidden" name="ChatName" value="{{ ChatName }}">
                 <button type="submit">Verlaat Chat</button>
             </form>

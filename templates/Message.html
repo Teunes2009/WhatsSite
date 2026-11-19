@@ -1,7 +1,19 @@
-{% if Messages %}
-    {% for Message in Messages %}
-        <p>{{ Message.Name }}: {{ Message.Text|safe }}</p>
+<!-- {% if Messages %} -->
+    {% for ID, Message in Messages.items() %}
+        <div class="message" data-message-id="{{ ID }}">
+            {% if Message.Type.startswith("image") %}
+                <p display="inline">{{ Message.Name }}: </p><img display="inline" src="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" style="max-width:400px;" alt="{{ Message.Filename }}"></p>
+            {% elif Message.Type.startswith("video") %}
+                <p display="inline">{{ Message.Name }}: </p><video display="inline" controls style="max-width:400px;"><source src="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" aria-label="{{ Message.Filename }}"></video>
+            {% elif Message.Type.startswith("audio") %}
+                <p display="inline">{{ Message.Name }}: </p><audio display="inline" controls><source src="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" type="{{ Message.Type }}" aria-label="{{ Message.Filename }}"></audio>
+            {% elif Message.Type == "text" %}
+                <p display="inline">{{ Message.Name }}: {{ Message.Content|safe }}</p>
+            {% else %}
+                <p display="inline">{{ Message.Name }}: </p><a display="inline" href="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" download>Download {{ Message.Filename }}</a></p>
+            {% endif %}
+        </div>
     {% endfor %}
-{% else %}
-    <h3>U hebt nog geen chats.</h3>
-{% endif %}
+<!-- {% else %}
+    <h3>Er zijn geen berichten om weer te geven.</h3>
+{% endif %} -->
