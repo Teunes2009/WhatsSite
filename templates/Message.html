@@ -1,6 +1,6 @@
-<!-- {% if Messages %} -->
+{% if Messages %}
     {% for ID, Message in Messages.items() %}
-        <div class="message" data-message-id="{{ ID }}">
+        <div class="message" data-message-id="{{ ID }}" id="M{{ ID }}">
             {% if Message.Type.startswith("image") %}
                 <p>{{ Message.Name }}: </p><img src="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" style="max-width:400px;" alt="{{ Message.Filename }}"></p>
             {% elif Message.Type.startswith("video") %}
@@ -12,8 +12,16 @@
             {% else %}
                 <p>{{ Message.Name }}: </p><a href="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" download>Download {{ Message.Filename }}</a></p>
             {% endif %}
+            {% if Message.Name == Name %}
+                {% if Message.Type == "text" %}
+                    <button hx-post="/ChangeMessage" hx-vals='{"ChatName": "{{ ChatName }}", "ID": "M{{ ID}}"}' hx-target="#M{{ ID }}" hx-swap="innerHTML" hx-prompt="Voer het veranderde bericht in:" Edit>Verander bericht</button>
+                {% endif %}
+                {% if Message.Content != "Dit bericht is verwijderd" %}
+                    <button hx-post="/DeleteMessage" hx-vals='{"ChatName": "{{ ChatName }}", "ID": "M{{ ID}}"}' hx-target="#M{{ ID }}" hx-swap="innerHTML" hx-confirm="Wil je dit bericht echt verwijderen?">Verwijder</button>
+                {% endif %}
+            {% endif %}
         </div>
     {% endfor %}
-<!-- {% else %}
+{% else %}
     <h3>Er zijn geen berichten om weer te geven.</h3>
-{% endif %} -->
+{% endif %}

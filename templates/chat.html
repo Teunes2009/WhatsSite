@@ -18,7 +18,7 @@
         </div>
         <form hx-post="/Send" hx-target="#MessageList" hx-swap="beforeend">
             <input type="hidden" name="ChatName" value="{{ ChatName }}">
-            <input type="text" name="Message" placeholder="Typ je bericht hier..." required>
+            <input type="text" name="Message" minlength="1" placeholder="Typ je bericht hier..." required>
             <button type="submit" class="ResetButton">Verstuur</button>
         </form>
         <form hx-post="/SendFile" hx-target="#MessageList" hx-swap="beforeend" enctype="multipart/form-data">

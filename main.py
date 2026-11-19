@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Form, Request, HTTPException, Cookie, UploadFile, File, Response
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlitedict import SqliteDict
@@ -11,6 +11,7 @@ from argon2.exceptions import VerifyMismatchError
 import secrets
 import time
 import re
+import json
 
 
 
@@ -55,20 +56,19 @@ async def NotFound(request: Request, fout):
     )
 
 @app.post("/login")
-async def login(request: Request, action: str = Form(...), naam: str = Form(...), wachtwoord: str = Form(min_length=4)):
+async def login(request: Request, action: str = Form(...), naam: str = Form(max_length=25), wachtwoord: str = Form(min_length=4)):
     with SqliteDict("wachtwoorden.db") as db:
         print(naam, wachtwoord)
         if naam in db:
             if action == "creëer":
-                raise HTTPException(status_code=403, detail="Gebruiker en wachtwoord komen niet overeen")
-            SavedPassword = db[naam]
+                raise HTTPException(status_code=404, detail="Gebruiker bestaat al")
             try:
-                ph.verify(SavedPassword, wachtwoord)
+                ph.verify(db[naam], wachtwoord)
             except VerifyMismatchError:
-                raise HTTPException(status_code=404, detail="Gebruiker en wachtwoord komen niet overeen")
+                raise HTTPException(status_code=403, detail="Gebruiker en wachtwoord komen niet overeen")
         else:
             if action == "inloggen":
-                raise HTTPException(status_code=404, detail="Gebruiker en wachtwoord komen niet overeen")
+                raise HTTPException(status_code=404, detail="Gebruiker bestaat niet")
             db[naam] = ph.hash(wachtwoord)
             db.commit()
     if naam in Admins:
@@ -105,8 +105,8 @@ async def login(request: Request, action: str = Form(...), naam: str = Form(...)
     return Response
 
 @app.post("/logout")
-async def logout(request: Request, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+async def logout(request: Request, UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
+    IsValidUser(Name, UserID)
     with SqliteDict("sessions.db") as db:
         del db[UserID]
         db.commit()
@@ -117,7 +117,7 @@ async def logout(request: Request, Name: str = Cookie(default=""), UserID: str =
 
 @app.post("/Create")
 async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Cookie(default=""), Members: str = Form(...), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     ChatName = ChatName.strip()
     print("Creating chat", ChatName, "with members", Members, "by", Name)
     # with SqliteDict("Chats.db") as db:
@@ -196,7 +196,7 @@ async def create_admin_chat(request: Request, ChatName: str = Form(...), Members
 
 @app.post("/GetChats")
 async def get_chats(request: Request, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     with SqliteDict("Chats.db") as db:
         print(list(db.keys()), Name, db[Name], db.get(Name, []))
         CurrentChats = db.get(Name, [])
@@ -222,7 +222,7 @@ async def get_all_chats(request: Request, Name: str = Cookie(default=""), UserID
 
 @app.post("/Send")
 async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     with SqliteDict("Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -232,25 +232,7 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
     if not Message:
         raise HTTPException(status_code=404, detail="Message is empty")
     
-    Message = escape(Message)
-    ReplacedURLs = []
-    url_pattern = re.compile(
-        r'\b(?:https?|ftp)://[^\s<>"]+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/[^\s<>"]*)?',
-        re.IGNORECASE
-    )
-    candidates = url_pattern.findall(Message)
-    for Word in candidates:
-        Word = Word.strip('!@#$%^&*()_+-=[]{};:\'",.<>?/\\|`~')
-        print(Word)
-        TestWord = Word
-        if not re.match(r'^(?:https?|ftp)://', Word, re.IGNORECASE):
-            TestWord = "http://" + Word
-        print(Word, validators.url(TestWord), ReplacedURLs, "hallo")
-        if validators.url(TestWord) == True and Word not in ReplacedURLs:
-            print(Message, Word, f'<a href="{TestWord}">{Word}</a>')
-            Message = Message.replace(Word, f'<a href="{TestWord}">{Word}</a>')
-            print(Message)
-            ReplacedURLs.append(Word)
+    Message = MakeURLWork(escape(Message))
     
     with SqliteDict("Messages.db") as db:
         print(list(db.keys()))
@@ -264,12 +246,12 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"Messages": {MessageID: {"Name": Name, "Content": Message, "Type": "text"}}}
+        {"Messages": {MessageID: {"Name": Name, "Content": Message, "Type": "text"}}, "Name": Name, "ChatName": ChatName}
     )
 
 @app.post("/SendFile")
 async def SendFile(request: Request, ChatName: str = Form(...), UploadedFile: UploadFile = File(...), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     Content = await UploadedFile.read()
     TypeHelp = UploadedFile.content_type
     with SqliteDict("Messages.db") as db:
@@ -284,13 +266,57 @@ async def SendFile(request: Request, ChatName: str = Form(...), UploadedFile: Up
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"Messages": {MessageID: {"Name": Name, "Content": Content, "Type": TypeHelp, "Filename": UploadedFile.filename}}}
+        {"Messages": {MessageID: {"Name": Name, "Content": Content, "Type": TypeHelp, "Filename": UploadedFile.filename}, "Name": Name, "ChatName": ChatName}}
     )
 
+@app.post("/ChangeMessage", response_class=HTMLResponse)
+async def change_message(request: Request, ChatName: str = Form(...), ID: str = Form(...), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
+    IsValidUser(Name, UserID)
+    prompt = MakeURLWork(escape(request.headers.get("HX-Prompt").strip()))
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Je hebt geen bericht ingetypt")
+    ID = int(ID.lstrip("M"))
+    with SqliteDict("Messages.db") as db:
+        Messages = db.get(ChatName, {})
+        if ID not in Messages:
+            raise HTTPException(status_code=404, detail="Bericht bestaat niet")
+        if Messages[ID]["Name"] != Name and Name not in Admins:
+            raise HTTPException(status_code=403, detail="Jij mag dit bericht niet aanpassen")
+        OriginalName = Messages[ID]["Name"]
+        if Messages[ID]["Type"] == "text":
+            Messages[ID]["Content"] = prompt
+        db[ChatName] = Messages
+        db.commit()
+    hxvals = json.dumps({'ChatName': ChatName, 'ID': f'M{ID}'})
+    return f"""<p>{OriginalName}: {prompt}</p>
+    <button hx-post="/ChangeMessage" hx-vals='{hxvals}' hx-target="#M{ID}" hx-swap="innerHTML" hx-prompt="Voer het veranderde bericht in:" Edit>Verander bericht</button>
+    <button hx-post="/DeleteMessage" hx-vals='{hxvals}' hx-target="#M{ID}" hx-swap="innerHTML" hx-confirm="Wil je dit bericht echt verwijderen?">Verwijder</button>"""
+
+@app.post("/DeleteMessage", response_class=HTMLResponse)
+async def delete_message(request: Request, ChatName: str = Form(...), ID: str = Form(...), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
+    IsValidUser(Name, UserID)
+    ID = int(ID.lstrip("M"))
+    with SqliteDict("Messages.db") as db:
+        Messages = db.get(ChatName, {})
+        if ID not in Messages:
+            raise HTTPException(status_code=404, detail="Bericht bestaat niet")
+        if Messages[ID]["Name"] != Name and Name not in Admins:
+            raise HTTPException(status_code=403, detail="Jij mag dit bericht niet verwijderen")
+        OriginalName = Messages[ID]["Name"]
+        Messages[ID]["Content"] = "Dit bericht is verwijderd"
+        if "FileName" in Messages[ID]:
+            Messages[ID]["Type"] = "text"
+            Messages[ID].erase("FileName")
+        db[ChatName] = Messages
+        print(Messages[ID])
+        db.commit()
+    hxvals = json.dumps({'ChatName': ChatName, 'ID': f'M{ID}'})
+    return f"""<p>{OriginalName}: Dit bericht is verwijderd</p>
+    <button hx-post="/ChangeMessage" hx-vals='{hxvals}' hx-target="#M{ID}" hx-swap="innerHTML" hx-prompt="Voer het veranderde bericht in:" Edit>Verander bericht</button>"""
 
 @app.post("/GetMessages")
 async def get_messages(request: Request, ChatName: str = Form(...), AfterID: int = Form(default=-2), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     with SqliteDict("Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -308,7 +334,7 @@ async def get_messages(request: Request, ChatName: str = Form(...), AfterID: int
 
 @app.post("/NewMember")
 async def new_member(request: Request, ChatName: str = Form(...), NewMember: str = Form(...), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     with SqliteDict("Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -332,7 +358,7 @@ async def new_member(request: Request, ChatName: str = Form(...), NewMember: str
 
 @app.post("/GetMembers")
 async def get_members(request: Request, ChatName: str = Form(...), Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     with SqliteDict("Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -350,7 +376,7 @@ async def get_members(request: Request, ChatName: str = Form(...), Name: str = C
 
 @app.post("/Leave")
 async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     if ChatName == "Main":
         raise HTTPException(status_code=404, detail="You cannot leave the Main chat")
     Chats = []
@@ -371,7 +397,7 @@ async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Co
 
 @app.post("/GoBack")
 async def go_back(request: Request, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     with SqliteDict("Chats.db") as db:
         CurrentChats = db.get(Name, [])
     print(CurrentChats)
@@ -383,7 +409,7 @@ async def go_back(request: Request, Name: str = Cookie(default=""), UserID: str 
 
 @app.post("/Chats/{ChatName}")
 async def chat(request: Request, ChatName: str, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     with SqliteDict("Chats.db") as db:
         if ChatName not in db.get(Name, []):
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
@@ -444,15 +470,7 @@ async def admin(request: Request, naam: str = Form(...)):
     Response.set_cookie(key="UserID", value=SessionID, max_age=COOKIES_MAX_LIFETIME, httponly=True)
     return Response
 
-@app.get("/bedankt")
-async def bedankt():
-    return FileResponse("static/pages/bedankt.html")
-
-@app.get("/form")
-async def form():
-    return FileResponse("static/pages/form.html")
-
-def IsValidUser(UserID: str):
+def IsValidUser(Name: str, UserID: str):
     with SqliteDict("sessions.db") as sessies:
         mijn = sessies.get(UserID, {})
         print("sessie", mijn, "cookie", UserID, UserID in sessies)
@@ -461,10 +479,27 @@ def IsValidUser(UserID: str):
             del sessies[UserID]
             sessies.commit()
             sessie = {}
+        if mijn and mijn.get("naam", "") != Name:
+            sessie = {}
     if not sessie:
         raise HTTPException(status_code=404, detail="Invalide sessie")
 
 def IsValidAdmin(Name: str, UserID: str):
-    IsValidUser(UserID)
+    IsValidUser(Name, UserID)
     if Name not in Admins:
         raise HTTPException(status_code=403, detail="Je bent geen admin")
+
+def MakeURLWork(Text: str):
+    ReplacedURLs = []
+    url_pattern = re.compile(r'\b(?:https?|ftp)://[^\s<>"]+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/[^\s<>"]*)?', re.IGNORECASE)
+    candidates = url_pattern.findall(Text)
+    ReplacedURLs = []
+    for Word in candidates:
+        Word = Word.strip('!@#$%^&*()_+-=[]{};:\'",.<>?/\\|`~')
+        TestWord = Word
+        if not re.match(r'^(?:https?|ftp)://', Word, re.IGNORECASE):
+            TestWord = "http://" + Word
+        if validators.url(TestWord) == True and Word not in ReplacedURLs:
+            Text = Text.replace(Word, f'<a href="{TestWord}">{Word}</a>')
+            ReplacedURLs.append(Word)
+    return Text
