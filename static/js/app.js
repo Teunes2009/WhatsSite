@@ -3,3 +3,8 @@ document.body.addEventListener("htmx:afterRequest", function (event) {
         event.detail.elt.reset();
     }
 });
+
+const MessageList = document.getElementById("MessageList");
+if (MessageList) {
+    MessageList.scrollTop = MessageList.scrollHeight;
+}

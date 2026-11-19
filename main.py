@@ -1,8 +1,7 @@
-from fastapi import FastAPI, Form, Request, HTTPException, Query, Cookie, UploadFile, File, Response
+from fastapi import FastAPI, Form, Request, HTTPException, Cookie, UploadFile, File, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from httpcore import request
 from sqlitedict import SqliteDict
 from html import escape
 import validators
@@ -240,13 +239,18 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
         re.IGNORECASE
     )
     candidates = url_pattern.findall(Message)
-    for word in candidates:
-        word = word.strip('!@#$%^&*()_+-=[]{};:\'",.<>?/\\|`~')
-        if not re.match(r'^(?:https?|ftp)://', word, re.IGNORECASE):
-            word = "http://" + word
-        if validators.url(word) == True and word not in ReplacedURLs:
-            Message = Message.replace(word, f'<a href="{word}">{word}</a>')
-            ReplacedURLs.append(word)
+    for Word in candidates:
+        Word = Word.strip('!@#$%^&*()_+-=[]{};:\'",.<>?/\\|`~')
+        print(Word)
+        TestWord = Word
+        if not re.match(r'^(?:https?|ftp)://', Word, re.IGNORECASE):
+            TestWord = "http://" + Word
+        print(Word, validators.url(TestWord), ReplacedURLs, "hallo")
+        if validators.url(TestWord) == True and Word not in ReplacedURLs:
+            print(Message, Word, f'<a href="{TestWord}">{Word}</a>')
+            Message = Message.replace(Word, f'<a href="{TestWord}">{Word}</a>')
+            print(Message)
+            ReplacedURLs.append(Word)
     
     with SqliteDict("Messages.db") as db:
         print(list(db.keys()))
