@@ -172,10 +172,10 @@ async def create_admin_chat(request: Request, ChatName: str = Form(...), Members
 async def get_chats(request: Request, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
     IsValidUser(Name, UserID)
     if Name in Admins:    
-        with SqliteDict("data/Chats.db") as db:
+        with SqliteDict("data/Messages.db") as db:
             CurrentChats = list(db.keys())
     else:
-        with SqliteDict("data/Messages.db") as db:
+        with SqliteDict("data/Chats.db") as db:
             CurrentChats = db.get(Name, [])
     return templates.TemplateResponse(
         request,
