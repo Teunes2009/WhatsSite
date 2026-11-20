@@ -173,10 +173,10 @@ async def get_chats(request: Request, Name: str = Cookie(default=""), UserID: st
     IsValidUser(Name, UserID)
     if Name in Admins:    
         with SqliteDict("data/Chats.db") as db:
-            CurrentChats = db.get(Name, [])
+            CurrentChats = list(db.keys())
     else:
         with SqliteDict("data/Messages.db") as db:
-            CurrentChats = list(db.keys())
+            CurrentChats = db.get(Name, [])
     return templates.TemplateResponse(
         request,
         "ChatList.html",
