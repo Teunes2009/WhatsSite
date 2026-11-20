@@ -1,5 +1,5 @@
 services:
-  WhatsSite:
+  whatssite:
     build: .
     volumes:
       - data:/app/data
@@ -9,9 +9,9 @@ services:
       - FORWARDED_ALLOW_IPS=*
     labels:
       - traefik.enable=true
-      - traefik.http.routers.WhatsSite.rule=Host(`${DOMEIN:-161.35.150.139.nip.io}`)
-      - traefik.http.services.WhatsSite.loadbalancer.server.port=8000
-      - traefik.http.routers.WhatsSite.middlewares=hsts
+      - traefik.http.routers.whatssite.rule=Host(`${DOMEIN:-161.35.150.139.nip.io}`)
+      - traefik.http.services.whatssite.loadbalancer.server.port=8000
+      - traefik.http.routers.whatssite.middlewares=hsts
       - traefik.http.middlewares.hsts.headers.stsSeconds=86400
     restart: unless-stopped
 
