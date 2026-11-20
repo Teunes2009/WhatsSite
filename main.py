@@ -225,7 +225,7 @@ async def SendFile(request: Request, ChatName: str = Form(...), UploadedFile: Up
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"Messages": {MessageID: {"Name": Name, "Content": Content, "Type": TypeHelp, "Filename": UploadedFile.filename}, "Name": Name, "ChatName": ChatName}, "IsAdmin": Name in Admins}
+        {"Messages": {MessageID: {"Name": Name, "Content": Content, "Type": TypeHelp, "Filename": UploadedFile.filename}}, "Name": Name, "ChatName": ChatName, "IsAdmin": Name in Admins}
     )
 
 @app.post("/ChangeMessage", response_class=HTMLResponse)
