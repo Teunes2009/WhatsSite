@@ -32,12 +32,12 @@
             {% include "Members.html" %}
         </div>
         <br>
-        <form hx-post="/NewMember" hx-target="#MembersBox">
-            <input type="hidden" name="ChatName" value="{{ ChatName }}">
-            <input type="text" name="NewMember" placeholder="Voeg een nieuw lid toe..." required>
-            <button type="submit">Voeg lid toe</button>
-        </form>
         {% if ChatName != "Main" %}
+            <form hx-post="/NewMember" hx-target="#MembersBox">
+                <input type="hidden" name="ChatName" value="{{ ChatName }}">
+                <input type="text" name="NewMember" placeholder="Voeg een nieuw lid toe..." required>
+                <button type="submit">Voeg lid toe</button>
+            </form>
             <form method="post" action="/Leave">
                 <input type="hidden" name="ChatName" value="{{ ChatName }}">
                 <button type="submit">Verlaat Chat</button>
