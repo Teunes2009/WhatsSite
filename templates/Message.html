@@ -1,15 +1,15 @@
 {% for ID, Message in Messages.items() %}
     <div class="message" data-message-id="{{ ID }}" id="M{{ ID }}">
         {% if Message.Type.startswith("image") %}
-            <p>{{ Message.Name }}: </p><img src="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" style="max-width:400px;" alt="{{ Message.Filename }}"></p>
+            <p>{{ Message.Name }}: </p><img src="data:{{ Message.Type }};base64,{{ Message.Content }}" style="max-width:400px;" alt="{{ Message.Filename }}"></p>
         {% elif Message.Type.startswith("video") %}
-            <p>{{ Message.Name }}: </p><video controls style="max-width:400px;"><source src="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" aria-label="{{ Message.Filename }}"></video>
+            <p>{{ Message.Name }}: </p><video controls style="max-width:400px;"><source src="data:{{ Message.Type }};base64,{{ Message.Content }}" aria-label="{{ Message.Filename }}"></video>
         {% elif Message.Type.startswith("audio") %}
-            <p>{{ Message.Name }}: </p><audio controls><source src="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" type="{{ Message.Type }}" aria-label="{{ Message.Filename }}"></audio>
+            <p>{{ Message.Name }}: </p><audio controls><source src="data:{{ Message.Type }};base64,{{ Message.Content }}" type="{{ Message.Type }}" aria-label="{{ Message.Filename }}"></audio>
         {% elif Message.Type == "text" %}
             <p>{{ Message.Name }}: {{ Message.Content|safe }}</p>
         {% else %}
-            <p>{{ Message.Name }}: </p><a href="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" download>Download {{ Message.Filename }}</a></p>
+            <p>{{ Message.Name }}: </p><a href="data:{{ Message.Type }};base64,{{ Message.Content }}" download>Download {{ Message.Filename }}</a></p>
         {% endif %}
         {% if Message.Name == Name or IsAdmin %}
             {% if Message.Type == "text" %}

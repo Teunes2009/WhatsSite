@@ -213,6 +213,7 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
 async def SendFile(request: Request, ChatName: str = Form(...), UploadedFile: UploadFile = File(...), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
     IsValidUser(Name, UserID)
     Content = await UploadedFile.read()
+    Content = base64.b64encode(Content).decode("utf-8")
     TypeHelp = UploadedFile.content_type
     with SqliteDict("data/Messages.db") as db:
         if ChatName not in db:
