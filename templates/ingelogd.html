@@ -2,7 +2,6 @@
 <html>
     <head>
         <title>Home</title>
-        <link rel="stylesheet" href="/static/css/style.css">
         <script src="/static/js/app.js" defer></script>
         <script src="/static/js/htmx.min.js"></script>
     </head>
@@ -13,26 +12,13 @@
         <h1>Hallo, {{ naam }}!</h1>
         <p>Dit zijn uw chats:</p>
         <div id="ChatList" hx-post="/GetChats" hx-trigger="every 2s, visibilitychange from:body" hx-target="#ChatList">
-            {% if Messages %}
-                <ul>
-                {% for ChatName in Messages %}
-                    <li>
-                        <form method=post action="/Chats/{{ ChatName }}">
-                            <input type="hidden" name="ChatName" value="{{ ChatName }}">
-                            <button type="submit">{{ ChatName }}</button>
-                        </form>
-                    </li>
-                {% endfor %}
-                </ul>
-            {% else %}
-                <h3>U heeft nog geen chats.</h3>
-            {% endif %}
+            {% include "ChatList.html" %}
         </div>
         <p>Maak een nieuwe chat aan:</p>
         <form hx-post="/Create" hx-target="#ChatList">
             <input type="text" name="ChatName" placeholder="Naam van de chat" required>
             <input type="text" name="Members" placeholder="Leden van de chat, gescheiden door een komma" required>
-            <button type="submit" class="ResetButton">Nieuwe Chat</button>
+            <button type="submit">Nieuwe Chat</button>
         </form>
         <br>
         <form method="post" action="/logout">

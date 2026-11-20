@@ -12,6 +12,7 @@ import secrets
 import time
 import re
 import json
+import os
 
 
 
@@ -21,6 +22,8 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+os.makedirs("data", exist_ok=True)
 
 def b64encode(data: bytes) -> str:
     return base64.b64encode(data).decode('utf-8')
@@ -32,19 +35,10 @@ Admins = ["Teun", "Admin"]
 
 @app.get("/")
 async def home():
-    return FileResponse("static/pages/home.html")
-
-@app.get("/project")
-async def project():
     return FileResponse("static/pages/form.html")
-
-@app.get("/about")
-async def about():
-    return FileResponse("static/pages/about.html")
 
 @app.exception_handler(404)
 async def NotFound(request: Request, fout):
-    print("404 error:", fout)
     fout = str(fout)[5:]
     if fout == "Not Found":
         fout = "Pagina niet gevonden"
@@ -57,8 +51,7 @@ async def NotFound(request: Request, fout):
 
 @app.post("/login")
 async def login(request: Request, action: str = Form(...), naam: str = Form(max_length=25), wachtwoord: str = Form(min_length=4)):
-    with SqliteDict("wachtwoorden.db") as db:
-        print(naam, wachtwoord)
+    with SqliteDict("data/wachtwoorden.db") as db:
         if naam in db:
             if action == "creëer":
                 raise HTTPException(status_code=404, detail="Gebruiker bestaat al")
@@ -73,24 +66,22 @@ async def login(request: Request, action: str = Form(...), naam: str = Form(max_
             db.commit()
     if naam in Admins:
         return RedirectResponse(url="/admin")
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if naam not in db:
             if action == "inloggen":
                 raise HTTPException(status_code=404, detail=f"gebruiker {naam} bestaat niet")
             db[naam] = ["Main"]
             db.commit()
         CurrentChats = db[naam]
-    print(CurrentChats)
-    with SqliteDict("Messages.db") as db:
+    with SqliteDict("data/Messages.db") as db:
         for Chat in CurrentChats:
             if Chat not in db:
                 if action == "inloggen":
                     raise HTTPException(status_code=404, detail=f"Chat {Chat} bestaat niet")
                 db[Chat] = {}
                 db.commit()
-        # messages = db[naam].get("", [])
     SessionID = secrets.token_hex(16)
-    with SqliteDict("sessions.db") as db:
+    with SqliteDict("data/sessions.db") as db:
         Sessions = db
         Sessions[SessionID] = {"naam": naam, "tot": time.time() + COOKIES_MAX_LIFETIME}
         db = Sessions
@@ -107,7 +98,7 @@ async def login(request: Request, action: str = Form(...), naam: str = Form(max_
 @app.post("/logout")
 async def logout(request: Request, UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("sessions.db") as db:
+    with SqliteDict("data/sessions.db") as db:
         del db[UserID]
         db.commit()
     Response = RedirectResponse(url="/")
@@ -119,38 +110,27 @@ async def logout(request: Request, UserID: str = Cookie(default=""), Name: str =
 async def create_chat(request: Request, ChatName: str = Form(...), Name: str = Cookie(default=""), Members: str = Form(...), UserID: str = Cookie(default="")):
     IsValidUser(Name, UserID)
     ChatName = ChatName.strip()
-    print("Creating chat", ChatName, "with members", Members, "by", Name)
-    # with SqliteDict("Chats.db") as db:
-    #     print(db.keys(), ChatName, db.get_key(ChatName, []), "hoi")
-    with SqliteDict("Messages.db") as db:
-        print(list(db.keys()), db.get(ChatName, [1]), "hoi", ChatName in db)
-        if ChatName.strip() in db:
+    with SqliteDict("data/Messages.db") as db:
+        if ChatName in db:
             raise HTTPException(status_code=404, detail=f"{ChatName} already exists")
-        if ChatName in ["Main", "Send", "GetMessages", "NewMember", "Leave", ""]:
+        if ChatName in ["Main", ""]:
             raise HTTPException(status_code=404, detail="Chat name is invalid")
         db[ChatName] = {}
-        print(db[ChatName], "created chat", ChatName)
         db.commit()
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         NewMembers = [Name]
         MemberList = Members.split(",")
         MemberList = [Member.strip() for Member in MemberList if Member.strip()]
         for Member in MemberList.copy():
             Member = Member.strip()
-            print(Member, Member in db)
             if Member in db:
                 Chats = db[Member]
                 Chats.append(ChatName)
                 db[Member] = Chats
                 NewMembers.append(Member)
-                # db[Member].append(ChatName)
-        print("New members:", NewMembers)
-        print(db[Name], ChatName)
         Chats = db[Name]
         Chats.append(ChatName)
         db[Name] = Chats
-        # db[Name].append(ChatName)
-        print(db[Name], NewMembers, ChatName, "added chat", ChatName, "to members", NewMembers)
         Chats = db[Name]
         db.commit()
     return templates.TemplateResponse(
@@ -163,30 +143,24 @@ async def create_chat(request: Request, ChatName: str = Form(...), Name: str = C
 async def create_admin_chat(request: Request, ChatName: str = Form(...), Members: str = Form(...), UserID: str = Cookie(default=""),  Name: str = Cookie(default="")):
     IsValidAdmin(Name, UserID)
     ChatName = ChatName.strip()
-    with SqliteDict("Messages.db") as db:
-        print(list(db.keys()), db.get(ChatName, [1]), "hoi", ChatName in db)
-        if ChatName.strip() in db:
+    with SqliteDict("data/Messages.db") as db:
+        if ChatName in db:
             raise HTTPException(status_code=404, detail=f"{ChatName} already exists")
-        if ChatName in ["Main", "Send", "GetMessages", "NewMember", "Leave", ""]:
+        if ChatName in ["Main", ""]:
             raise HTTPException(status_code=404, detail="Chat name is invalid")
         db[ChatName] = {}
-        print(db[ChatName], "created chat", ChatName)
         db.commit()
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         NewMembers = []
         MemberList = Members.split(",")
         MemberList = [Member.strip() for Member in MemberList if Member.strip()]
         for Member in MemberList.copy():
             Member = Member.strip()
-            print(Member, Member in db)
             if Member in db:
                 Chats = db[Member]
                 Chats.append(ChatName)
                 db[Member] = Chats
                 NewMembers.append(Member)
-                # db[Member].append(ChatName)
-        print("New members:", NewMembers)
-        print(db[Name], ChatName)
         db.commit()
     return templates.TemplateResponse(
         request,
@@ -197,23 +171,12 @@ async def create_admin_chat(request: Request, ChatName: str = Form(...), Members
 @app.post("/GetChats")
 async def get_chats(request: Request, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("Chats.db") as db:
-        print(list(db.keys()), Name, db[Name], db.get(Name, []))
-        CurrentChats = db.get(Name, [])
-    print(CurrentChats)
-    return templates.TemplateResponse(
-        request,
-        "ChatList.html",
-        {"naam": Name, "Messages": CurrentChats}
-    )
-
-@app.post("/GetAllChats")
-async def get_all_chats(request: Request, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    print(Name, UserID)
-    IsValidAdmin(Name, UserID)
-    with SqliteDict("Messages.db") as db:
-        CurrentChats = list(db.keys())
-    print(CurrentChats)
+    if Name in Admins:    
+        with SqliteDict("data/Chats.db") as db:
+            CurrentChats = db.get(Name, [])
+    else:
+        with SqliteDict("data/Messages.db") as db:
+            CurrentChats = list(db.keys())
     return templates.TemplateResponse(
         request,
         "ChatList.html",
@@ -223,19 +186,16 @@ async def get_all_chats(request: Request, Name: str = Cookie(default=""), UserID
 @app.post("/Send")
 async def send(request: Request, Message: str = Form(...), ChatName: str = Form(...), Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
-    print(Name, "sent ", Message, "in", ChatName)
-    print(Message, ChatName, Name)
     Message = Message.strip()
     if not Message:
         raise HTTPException(status_code=404, detail="Message is empty")
     
     Message = MakeURLWork(escape(Message))
     
-    with SqliteDict("Messages.db") as db:
-        print(list(db.keys()))
+    with SqliteDict("data/Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = {}
         Messages = db[ChatName]
@@ -246,7 +206,7 @@ async def send(request: Request, Message: str = Form(...), ChatName: str = Form(
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"Messages": {MessageID: {"Name": Name, "Content": Message, "Type": "text"}}, "Name": Name, "ChatName": ChatName}
+        {"Messages": {MessageID: {"Name": Name, "Content": Message, "Type": "text"}}, "Name": Name, "ChatName": ChatName, "IsAdmin": Name in Admins}
     )
 
 @app.post("/SendFile")
@@ -254,8 +214,7 @@ async def SendFile(request: Request, ChatName: str = Form(...), UploadedFile: Up
     IsValidUser(Name, UserID)
     Content = await UploadedFile.read()
     TypeHelp = UploadedFile.content_type
-    with SqliteDict("Messages.db") as db:
-        print(list(db.keys()))
+    with SqliteDict("data/Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = {}
         Messages = db[ChatName]
@@ -266,7 +225,7 @@ async def SendFile(request: Request, ChatName: str = Form(...), UploadedFile: Up
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"Messages": {MessageID: {"Name": Name, "Content": Content, "Type": TypeHelp, "Filename": UploadedFile.filename}, "Name": Name, "ChatName": ChatName}}
+        {"Messages": {MessageID: {"Name": Name, "Content": Content, "Type": TypeHelp, "Filename": UploadedFile.filename}, "Name": Name, "ChatName": ChatName}, "IsAdmin": Name in Admins}
     )
 
 @app.post("/ChangeMessage", response_class=HTMLResponse)
@@ -276,7 +235,7 @@ async def change_message(request: Request, ChatName: str = Form(...), ID: str = 
     if not prompt:
         raise HTTPException(status_code=404, detail="Je hebt geen bericht ingetypt")
     ID = int(ID.lstrip("M"))
-    with SqliteDict("Messages.db") as db:
+    with SqliteDict("data/Messages.db") as db:
         Messages = db.get(ChatName, {})
         if ID not in Messages:
             raise HTTPException(status_code=404, detail="Bericht bestaat niet")
@@ -296,7 +255,7 @@ async def change_message(request: Request, ChatName: str = Form(...), ID: str = 
 async def delete_message(request: Request, ChatName: str = Form(...), ID: str = Form(...), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
     IsValidUser(Name, UserID)
     ID = int(ID.lstrip("M"))
-    with SqliteDict("Messages.db") as db:
+    with SqliteDict("data/Messages.db") as db:
         Messages = db.get(ChatName, {})
         if ID not in Messages:
             raise HTTPException(status_code=404, detail="Bericht bestaat niet")
@@ -308,7 +267,6 @@ async def delete_message(request: Request, ChatName: str = Form(...), ID: str = 
             Messages[ID]["Type"] = "text"
             Messages[ID].erase("FileName")
         db[ChatName] = Messages
-        print(Messages[ID])
         db.commit()
     hxvals = json.dumps({'ChatName': ChatName, 'ID': f'M{ID}'})
     return f"""<p>{OriginalName}: Dit bericht is verwijderd</p>
@@ -317,35 +275,32 @@ async def delete_message(request: Request, ChatName: str = Form(...), ID: str = 
 @app.post("/GetMessages")
 async def get_messages(request: Request, ChatName: str = Form(...), AfterID: int = Form(default=-2), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
-    with SqliteDict("Messages.db") as db:
+    with SqliteDict("data/Messages.db") as db:
         Messages = db.get(ChatName, {})
         Messages = {ID: Messages[ID] for ID in sorted(Messages) if ID > AfterID}
-        # print(Messages)
     if not Messages:
         return Response(status_code=204)
     return templates.TemplateResponse(
         request,
         "Message.html",
-        {"Messages": Messages}
+        {"Messages": Messages, "IsAdmin": Name in Admins}
     )
 
 @app.post("/NewMember")
 async def new_member(request: Request, ChatName: str = Form(...), NewMember: str = Form(...), UserID: str = Cookie(default=""), Name: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     Members = []
-    print(Name, "added", NewMember, "to", ChatName)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if ChatName not in db[NewMember]:
             Chats = db[NewMember]
             Chats.append(ChatName)
             db[NewMember] = Chats
-            # db[NewMember].append(ChatName)
             db.commit()
             for Member in db.keys():
                 if ChatName in db[Member]:
@@ -359,12 +314,11 @@ async def new_member(request: Request, ChatName: str = Form(...), NewMember: str
 @app.post("/GetMembers")
 async def get_members(request: Request, ChatName: str = Form(...), Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if ChatName not in db.get(Name, []) and Name not in Admins:
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
     Members = []
-    print(ChatName)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         for Member in db.keys():
             if ChatName in db[Member]:
                 Members.append(Member)
@@ -380,15 +334,13 @@ async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Co
     if ChatName == "Main":
         raise HTTPException(status_code=404, detail="You cannot leave the Main chat")
     Chats = []
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if ChatName not in db.get(Name, []):
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
         Chats = db[Name]
         Chats.remove(ChatName)
         db[Name] = Chats
-        # db[Name].remove(ChatName)
         db.commit()
-        # Chats = db.get(Name, [])
     return templates.TemplateResponse(
         request,
         "ingelogd.html",
@@ -398,9 +350,8 @@ async def leave_chat(request: Request, ChatName: str = Form(...), Name: str = Co
 @app.post("/GoBack")
 async def go_back(request: Request, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         CurrentChats = db.get(Name, [])
-    print(CurrentChats)
     return templates.TemplateResponse(
         request,
         "ingelogd.html",
@@ -410,54 +361,31 @@ async def go_back(request: Request, Name: str = Cookie(default=""), UserID: str 
 @app.post("/Chats/{ChatName}")
 async def chat(request: Request, ChatName: str, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
     IsValidUser(Name, UserID)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         if ChatName not in db.get(Name, []):
             raise HTTPException(status_code=404, detail="Je zit niet in deze chat")
-    with SqliteDict("Messages.db") as db:
+    with SqliteDict("data/Messages.db") as db:
         if ChatName not in db:
             db[ChatName] = []
             db.commit()
         Messages = db[ChatName]
-        # print(Messages)
-    with SqliteDict("Chats.db") as db:
+    with SqliteDict("data/Chats.db") as db:
         Members = []
         for Member in db.keys():
             if ChatName in db[Member]:
                 Members.append(Member)
-        # print(Members)
     return templates.TemplateResponse(
         request,
         "chat.html",
         {"ChatName": ChatName, "Messages": Messages, "Name": Name, "Members": Members}
     )
 
-@app.post("/Admin/{ChatName}")
-async def admin_chat(request: Request, ChatName: str, Name: str = Cookie(default=""), UserID: str = Cookie(default="")):
-    IsValidAdmin(Name, UserID)
-    with SqliteDict("Messages.db") as db:
-        if ChatName not in db:
-            db[ChatName] = []
-            db.commit()
-        Messages = db[ChatName]
-        print(Messages)
-    with SqliteDict("Chats.db") as db:
-        Members = []
-        for Member in db.keys():
-            if ChatName in db[Member]:
-                Members.append(Member)
-        print(Members)
-    return templates.TemplateResponse(
-        request,
-        "adminchat.html",
-        {"ChatName": ChatName, "Messages": Messages, "Name": Name, "Members": Members}
-    )
-
 @app.post("/admin")
 async def admin(request: Request, naam: str = Form(...)):
-    with SqliteDict("Messages.db") as db:
+    with SqliteDict("data/Messages.db") as db:
         AllChats = list(db.keys())
     SessionID = secrets.token_hex(16)
-    with SqliteDict("sessions.db") as db:
+    with SqliteDict("data/sessions.db") as db:
         Sessions = db
         Sessions[SessionID] = {"naam": naam, "tot": time.time() + COOKIES_MAX_LIFETIME}
         db = Sessions
@@ -471,9 +399,8 @@ async def admin(request: Request, naam: str = Form(...)):
     return Response
 
 def IsValidUser(Name: str, UserID: str):
-    with SqliteDict("sessions.db") as sessies:
+    with SqliteDict("data/sessions.db") as sessies:
         mijn = sessies.get(UserID, {})
-        print("sessie", mijn, "cookie", UserID, UserID in sessies)
         sessie = mijn
         if mijn and mijn.get("tot", 0) < time.time():
             del sessies[UserID]

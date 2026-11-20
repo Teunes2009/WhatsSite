@@ -12,7 +12,7 @@
             {% else %}
                 <p>{{ Message.Name }}: </p><a href="data:{{ Message.Type }};base64,{{ Message.Content | b64encode }}" download>Download {{ Message.Filename }}</a></p>
             {% endif %}
-            {% if Message.Name == Name %}
+            {% if Message.Name == Name or IsAdmin %}
                 {% if Message.Type == "text" %}
                     <button hx-post="/ChangeMessage" hx-vals='{"ChatName": "{{ ChatName }}", "ID": "M{{ ID}}"}' hx-target="#M{{ ID }}" hx-swap="innerHTML" hx-prompt="Voer het veranderde bericht in:" Edit>Verander bericht</button>
                 {% endif %}
